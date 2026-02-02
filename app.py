@@ -1,8 +1,8 @@
 import os
 import streamlit as st
-from src.db import init_db
-from src.users_repo import get_user_by_email, create_user
-from src.rbac import ROLE_ADMIN
+from src.core.db import init_db
+from src.repos.users_repo import get_user_by_email, create_user
+from src.auth.rbac import ROLE_ADMIN
 
 def seed_admin():
     admin_email = os.getenv("ADMIN_EMAIL")

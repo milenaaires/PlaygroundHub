@@ -1,6 +1,6 @@
 import streamlit as st
-from src.rbac import require_roles, ROLE_ADMIN
-from src.users_repo import list_users, create_user, update_user, set_password
+from src.auth.rbac import require_roles, ROLE_ADMIN
+from src.repos.users_repo import list_users, create_user, update_user, set_password
 
 require_roles({ROLE_ADMIN})
 

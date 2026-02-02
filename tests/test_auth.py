@@ -1,4 +1,4 @@
-from src.auth import hash_password, verify_password
+from src.auth.auth import hash_password, verify_password
 
 def test_hash_and_verify():
     pw = "SenhaForte@123"

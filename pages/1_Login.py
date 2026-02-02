@@ -1,6 +1,6 @@
 import streamlit as st
-from src.users_repo import get_user_by_email
-from src.auth import verify_password
+from src.repos.users_repo import get_user_by_email
+from src.auth.auth import verify_password
 
 st.title("Login")
 

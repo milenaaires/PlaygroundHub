@@ -1,8 +1,8 @@
 import os
 import tempfile
-from src.db import init_db
-from src.users_repo import create_user, get_user_by_email, list_users, update_user, set_password
-from src.auth import verify_password
+from src.core.db import init_db
+from src.repos.users_repo import create_user, get_user_by_email, list_users, update_user, set_password
+from src.auth.auth import verify_password
 
 def setup_temp_db():
     tmp = tempfile.NamedTemporaryFile(delete=False)

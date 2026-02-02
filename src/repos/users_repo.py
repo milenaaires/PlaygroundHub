@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
-from .db import connect
-from .auth import hash_password
+from ..core.db import connect
+from ..auth.auth import hash_password
 
 def create_user(email: str, password: str, role: str, active: bool = True) -> int:
     conn = connect()
