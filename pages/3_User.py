@@ -15,6 +15,8 @@ from src.repos.chat_repo import (
     list_chats,
     get_chat,
     update_previous_response_id,
+    rename_chat,
+    delete_chat,
 )
 from src.agents.service import run_agent_chat
 from src.core.db import init_db
@@ -105,7 +107,7 @@ def _render_chat_config_and_messages(prefix=""):
             prev_id = st.session_state.get(prev_key)
             try:
                 with st.spinner("Consultando o agente..."):
-                    reply, resp_id = run_agent_chat(
+                    reply, resp_id, _usage = run_agent_chat(
                         agent_cfg,
                         prompt,
                         previous_response_id=prev_id,
@@ -151,6 +153,14 @@ def _render_access_chat(prefix: str):
 
     chat_id = st.session_state.get(key_chat)
 
+    if not chat_id:
+        if st.button("Novo chat", key=f"{prefix}new_chat", use_container_width=True):
+            new_chat_id = create_chat(user_id, agent_id)
+            st.session_state[key_chat] = new_chat_id
+            if prefix == "access_popup_":
+                st.session_state["reopen_popup"] = "access_chat"
+            st.rerun()
+
     if chat_id:
         # Modo conversa: mostra mensagens e input; botão Voltar para lista de chats
         if st.button("← Voltar para lista de chats", key=f"{prefix}back_chats"):
@@ -171,17 +181,19 @@ def _render_access_chat(prefix: str):
                 if prefix == "access_popup_":
                     st.session_state["reopen_popup"] = "access_chat"
                 st.rerun()
-            add_message(chat_id, "user", prompt)
             chat = get_chat(chat_id, user_id)
             prev_id = chat.get("previous_response_id") if chat else None
             try:
                 with st.spinner("Consultando o agente..."):
-                    reply, resp_id = run_agent_chat(
+                    reply, resp_id, usage = run_agent_chat(
                         agent,
                         prompt,
                         previous_response_id=prev_id,
                     )
-                add_message(chat_id, "assistant", reply)
+                input_tokens = usage.get("input_tokens") if usage else None
+                output_tokens = usage.get("output_tokens") if usage else None
+                add_message(chat_id, "user", prompt, tokens=input_tokens)
+                add_message(chat_id, "assistant", reply, tokens=output_tokens)
                 update_previous_response_id(chat_id, user_id, resp_id)
             except Exception as e:
                 st.error(f"Erro ao consultar o modelo: {e}")
@@ -191,22 +203,69 @@ def _render_access_chat(prefix: str):
 
     chats = list_chats(user_id, agent_id)
     if chats:
-        st.subheader("Histórico de chats")
+        st.subheader("Hist?rico de chats")
+
+        rename_key = f"{prefix}rename_chat_id"
+        rename_id = st.session_state.get(rename_key)
+        if rename_id:
+            current = next((c for c in chats if c["id"] == rename_id), None)
+            if current:
+                current_title = current["title"]
+            else:
+                chat_row = get_chat(rename_id, user_id)
+                current_title = chat_row["title"] if chat_row else ""
+            st.markdown("**Renomear chat**")
+            new_title = st.text_input(
+                "Novo t?tulo",
+                value=current_title,
+                key=f"{prefix}rename_title",
+            )
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                if st.button("Salvar", key=f"{prefix}rename_save", use_container_width=True):
+                    if new_title.strip():
+                        rename_chat(rename_id, user_id, new_title.strip())
+                    st.session_state.pop(rename_key, None)
+                    if prefix == "access_popup_":
+                        st.session_state["reopen_popup"] = "access_chat"
+                    st.rerun()
+            with col_cancel:
+                if st.button("Cancelar", key=f"{prefix}rename_cancel", use_container_width=True):
+                    st.session_state.pop(rename_key, None)
+                    if prefix == "access_popup_":
+                        st.session_state["reopen_popup"] = "access_chat"
+                    st.rerun()
+            st.divider()
+
         for c in chats:
             with st.container():
-                col_info, col_open = st.columns([3, 1])
+                col_info, col_open, col_rename, col_delete = st.columns([3, 1, 1, 1])
                 with col_info:
                     st.markdown(f"**{c['title']}**")
-                    st.caption(c["created_at"])
+                    st.caption(c.get("updated_at") or c["created_at"])
                 with col_open:
                     if st.button("Abrir", key=f"{prefix}open_{c['id']}", use_container_width=True):
                         st.session_state[key_chat] = c["id"]
                         if prefix == "access_popup_":
                             st.session_state["reopen_popup"] = "access_chat"
                         st.rerun()
+                with col_rename:
+                    if st.button("Renomear", key=f"{prefix}rename_{c['id']}", use_container_width=True):
+                        st.session_state[rename_key] = c["id"]
+                        if prefix == "access_popup_":
+                            st.session_state["reopen_popup"] = "access_chat"
+                        st.rerun()
+                with col_delete:
+                    if st.button("Excluir", key=f"{prefix}delete_{c['id']}", use_container_width=True):
+                        delete_chat(c["id"], user_id)
+                        if st.session_state.get(key_chat) == c["id"]:
+                            st.session_state.pop(key_chat, None)
+                        if prefix == "access_popup_":
+                            st.session_state["reopen_popup"] = "access_chat"
+                        st.rerun()
                 st.divider()
     else:
-        st.info("Nenhum chat ainda. Clique em **Novo chat** para começar.")
+        st.info("Nenhum chat ainda. Clique em **Novo chat** para come?ar.")
 
 
 # Popup (Streamlit 1.33+); se não existir dialog, o conteúdo é exibido direto na aba Chat
@@ -308,7 +367,7 @@ if _dialog_decorator is not None:
                 prev_id = st.session_state.get(prev_key)
                 try:
                     with st.spinner("Consultando o agente..."):
-                        reply, resp_id = run_agent_chat(
+                        reply, resp_id, _usage = run_agent_chat(
                             agent_cfg,
                             prompt,
                             previous_response_id=prev_id,
