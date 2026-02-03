@@ -16,6 +16,7 @@ st.set_page_config(
 # --- Boot ---
 init_db()
 
+
 def ensure_admin():
     s = get_settings()
     email = (s.get("ADMIN_EMAIL") or "").strip().lower()
@@ -23,13 +24,14 @@ def ensure_admin():
     if email and pwd and not get_user_by_email(email):
         create_user(email=email, password=pwd, role="ADMIN", active=True)
 
+
 ensure_admin()
 
 # --- Sidebar status (uma vez só) ---
 sidebar_status()
 
 # --- Header (logo pequena + nome ao lado) ---
-logo_path = Path("assets/logo.png")
+logo_path = Path("assets/Logo.png")
 col1, col2 = st.columns([1, 8], vertical_alignment="center")
 
 with col1:
