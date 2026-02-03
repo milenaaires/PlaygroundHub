@@ -1,35 +1,44 @@
 import streamlit as st
 from src.auth.rbac import require_roles, ROLE_ADMIN
 from src.repos.users_repo import list_users, create_user, update_user, set_password
+from src.core.ui import sidebar_status
+sidebar_status()
 
 require_roles({ROLE_ADMIN})
 
 st.title("Admin - Usuários")
 
+search = st.text_input("Buscar por e-mail", placeholder="ex: user@empresa.com").strip().lower()
+
 users = list_users()
+users = [u for u in users if search in u["email"]]
 st.subheader("Lista de usuários")
 st.dataframe(
     [{ "id": u["id"], "email": u["email"], "role": u["role"], "active": bool(u["active"]) } for u in users],
     use_container_width=True
 )
+# Criar usuário
 
-st.divider()
-st.subheader("Criar usuário")
+import streamlit as st
 
-new_email = st.text_input("E-mail (novo usuário)", key="new_email")
-new_role = st.selectbox("Role", ["ADMIN", "USER", "COMPLIANCE"], key="new_role")
-new_pass = st.text_input("Senha inicial", type="password", key="new_pass")
+with st.form("create_user"):
+    new_email = st.text_input("E-mail (novo usuário)").strip().lower()
+    new_role = st.selectbox("Role", ["ADMIN", "USER", "COMPLIANCE"])
+    new_password = st.text_input("Senha inicial", type="password")
+    submitted = st.form_submit_button("Criar usuário", type="primary")
 
-if st.button("Criar"):
-    if not new_email or not new_pass:
-        st.error("Preencha e-mail e senha.")
-    else:
-        try:
-            create_user(new_email, new_pass, new_role, active=True)
-            st.success("Usuário criado.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao criar usuário: {e}")
+if submitted:
+    if "@" not in new_email or "." not in new_email:
+        st.error("E-mail inválido.")
+        st.stop()
+
+    if len(new_password) < 8:
+        st.error("A senha precisa ter pelo menos 8 caracteres.")
+        st.stop()
+
+    create_user(new_email, new_password, new_role, active=True)
+    st.success("Usuário criado com sucesso!")
+    st.rerun()
 
 st.divider()
 st.subheader("Editar usuário")

@@ -1,11 +1,26 @@
 import streamlit as st
 from src.repos.users_repo import get_user_by_email
 from src.auth.auth import verify_password
+from src.core.ui import sidebar_status
+sidebar_status()
 
 st.title("Login")
 
-email = st.text_input("E-mail")
+def is_logged():
+    return bool(st.session_state.get("authenticated"))
+
+
+if is_logged():
+    st.success(f"Você já está logado como **{st.session_state.get('email','')}** (`{st.session_state.get('role','')}`).")
+    if st.button("Sair (logout)", type="primary"):
+        st.session_state.clear()
+        st.rerun()
+    st.stop()
+
+email_input = st.text_input("E-mail")
 password = st.text_input("Senha", type="password")
+
+email = (email_input or "").strip().lower()
 
 if st.button("Entrar"):
     user = get_user_by_email(email)
