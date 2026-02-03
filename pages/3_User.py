@@ -1,5 +1,6 @@
 import streamlit as st
 from src.auth.rbac import require_roles, ROLE_USER, ROLE_ADMIN
+from src.core.config import get_settings
 from src.repos.agents_repo import (
     create_agent,
     list_agents_by_user,
@@ -7,7 +8,15 @@ from src.repos.agents_repo import (
     update_agent,
     delete_agent,
 )
-from src.repos.chat_repo import get_messages, add_message, create_chat, list_chats
+from src.repos.chat_repo import (
+    get_messages,
+    add_message,
+    create_chat,
+    list_chats,
+    get_chat,
+    update_previous_response_id,
+)
+from src.agents.service import run_agent_chat
 from src.core.db import init_db
 
 from src.core.ui import sidebar_status
@@ -34,6 +43,14 @@ if "edit_popup_chat_messages" not in st.session_state:
         {"role": "user", "content": "Olá!"},
         {"role": "assistant", "content": "Olá! Como posso ajudar?"},
     ]
+
+def _ensure_openai_key() -> bool:
+    settings = get_settings()
+    if not settings.get("OPENAI_API_KEY"):
+        st.error("OPENAI_API_KEY nao configurada.")
+        return False
+    return True
+
 
 
 def _render_chat_config_and_messages(prefix=""):
@@ -71,11 +88,35 @@ def _render_chat_config_and_messages(prefix=""):
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
         if prompt := st.chat_input("Digite sua mensagem...", key=f"{prefix}chat_input"):
+            if not _ensure_openai_key():
+                if prefix == "popup_":
+                    st.session_state["reopen_popup"] = "config"
+                st.rerun()
             st.session_state.chat_messages.append({"role": "user", "content": prompt})
-            st.session_state.chat_messages.append({
-                "role": "assistant",
-                "content": f"Você disse: «{prompt}». (Resposta simulada — integre o modelo aqui.)",
-            })
+            agent_cfg = {
+                "name": st.session_state.get(f"{prefix}agent_name", "Agent"),
+                "description": st.session_state.get(f"{prefix}agent_desc", ""),
+                "model": st.session_state.get(f"{prefix}model", "gpt-4o"),
+                "max_tokens": st.session_state.get(f"{prefix}tokens", 100),
+                "temperature": st.session_state.get(f"{prefix}temp", 0.5),
+                "system_prompt": st.session_state.get(f"{prefix}system", "You are a helpful assistant."),
+            }
+            prev_key = f"{prefix}prev_response_id"
+            prev_id = st.session_state.get(prev_key)
+            try:
+                with st.spinner("Consultando o agente..."):
+                    reply, resp_id = run_agent_chat(
+                        agent_cfg,
+                        prompt,
+                        previous_response_id=prev_id,
+                    )
+                st.session_state.chat_messages.append({"role": "assistant", "content": reply})
+                st.session_state[prev_key] = resp_id
+            except Exception as e:
+                st.session_state.chat_messages.append({
+                    "role": "assistant",
+                    "content": f"Erro ao consultar o modelo: {e}",
+                })
             if prefix == "popup_":
                 st.session_state["reopen_popup"] = "config"
             st.rerun()
@@ -126,22 +167,27 @@ def _render_access_chat(prefix: str):
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
         if prompt := st.chat_input("Digite sua mensagem...", key=f"{prefix}input"):
+            if not _ensure_openai_key():
+                if prefix == "access_popup_":
+                    st.session_state["reopen_popup"] = "access_chat"
+                st.rerun()
             add_message(chat_id, "user", prompt)
-            reply = f"Você disse: «{prompt}». (Resposta simulada — integre o modelo {agent['model']} aqui.)"
-            add_message(chat_id, "assistant", reply)
+            chat = get_chat(chat_id, user_id)
+            prev_id = chat.get("previous_response_id") if chat else None
+            try:
+                with st.spinner("Consultando o agente..."):
+                    reply, resp_id = run_agent_chat(
+                        agent,
+                        prompt,
+                        previous_response_id=prev_id,
+                    )
+                add_message(chat_id, "assistant", reply)
+                update_previous_response_id(chat_id, user_id, resp_id)
+            except Exception as e:
+                st.error(f"Erro ao consultar o modelo: {e}")
             if prefix == "access_popup_":
                 st.session_state["reopen_popup"] = "access_chat"
             st.rerun()
-        return
-
-    # Modo lista: Novo chat + histórico de chats para este agente
-    st.caption(f"Agente: **{agent['name']}** · Modelo: {agent['model']}")
-    if st.button("➕ Novo chat", type="primary", use_container_width=True, key=f"{prefix}new_chat"):
-        new_id = create_chat(user_id, agent_id)
-        st.session_state[key_chat] = new_id
-        if prefix == "access_popup_":
-            st.session_state["reopen_popup"] = "access_chat"
-        st.rerun()
 
     chats = list_chats(user_id, agent_id)
     if chats:
@@ -246,11 +292,34 @@ if _dialog_decorator is not None:
                 with st.chat_message(msg["role"]):
                     st.write(msg["content"])
             if prompt := st.chat_input("Digite sua mensagem...", key="edit_popup_chat_input"):
+                if not _ensure_openai_key():
+                    st.session_state["reopen_popup"] = "edit_agent"
+                    st.rerun()
                 st.session_state.edit_popup_chat_messages.append({"role": "user", "content": prompt})
-                st.session_state.edit_popup_chat_messages.append({
-                    "role": "assistant",
-                    "content": f"Você disse: «{prompt}». (Resposta simulada.)",
-                })
+                agent_cfg = {
+                    "name": st.session_state.get("edit_popup_name", agent.get("name", "Agent")),
+                    "description": st.session_state.get("edit_popup_desc", agent.get("description", "")),
+                    "model": st.session_state.get("edit_popup_model", agent.get("model", "gpt-4o")),
+                    "max_tokens": st.session_state.get("edit_popup_tokens", agent.get("max_tokens", 100)),
+                    "temperature": st.session_state.get("edit_popup_temp", agent.get("temperature", 0.5)),
+                    "system_prompt": st.session_state.get("edit_popup_system", agent.get("system_prompt", "")),
+                }
+                prev_key = "edit_popup_prev_response_id"
+                prev_id = st.session_state.get(prev_key)
+                try:
+                    with st.spinner("Consultando o agente..."):
+                        reply, resp_id = run_agent_chat(
+                            agent_cfg,
+                            prompt,
+                            previous_response_id=prev_id,
+                        )
+                    st.session_state.edit_popup_chat_messages.append({"role": "assistant", "content": reply})
+                    st.session_state[prev_key] = resp_id
+                except Exception as e:
+                    st.session_state.edit_popup_chat_messages.append({
+                        "role": "assistant",
+                        "content": f"Erro ao consultar o modelo: {e}",
+                    })
                 st.session_state["reopen_popup"] = "edit_agent"
                 st.rerun()
 

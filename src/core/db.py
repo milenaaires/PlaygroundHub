@@ -1,12 +1,9 @@
-# src/core/db.py
-import os
+﻿import os
 import sqlite3
 from pathlib import Path
 
-
 def get_db_path() -> str:
-    return os.getenv("APP_DB_PATH", "data/app.db")
-
+    return os.getenv('APP_DB_PATH', 'data/app.db')
 
 def connect():
     db_path = get_db_path()
@@ -15,13 +12,10 @@ def connect():
     conn.row_factory = sqlite3.Row
     return conn
 
-
 def init_db():
     conn = connect()
     cur = conn.cursor()
-
-    # ... (Tabelas users, agents, chats mantidas iguais) ...
-    cur.execute("""
+    cur.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT NOT NULL UNIQUE,
@@ -31,9 +25,9 @@ def init_db():
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    """)
+    ''')
 
-    cur.execute("""
+    cur.execute('''
     CREATE TABLE IF NOT EXISTS agents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -45,35 +39,57 @@ def init_db():
         system_prompt TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    """)
+    ''')
 
-    cur.execute("""
+    cur.execute('''
     CREATE TABLE IF NOT EXISTS chats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL REFERENCES users(id),
         agent_id INTEGER NOT NULL REFERENCES agents(id),
         title TEXT NOT NULL,
+        previous_response_id TEXT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    """)
+    ''')
 
-    # 1. Cria a tabela se não existir (Adicionei a coluna TOKENS)
-    cur.execute("""
+    # Migracao: se chat_messages antiga (user_id, agent_id) existir, substituir pela nova (chat_id)
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chat_messages'")
+    if cur.fetchone():
+        cur.execute('PRAGMA table_info(chat_messages)')
+        cols = [row[1] for row in cur.fetchall()]
+        if 'agent_id' in cols or 'user_id' in cols:
+            cur.execute('DROP TABLE chat_messages')
+    cur.execute('''
     CREATE TABLE IF NOT EXISTS chat_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
         role TEXT NOT NULL,
         content TEXT NOT NULL,
-        tokens INTEGER DEFAULT 0,  -- <--- NOVA COLUNA NECESSÁRIA
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    """)
+    ''')
 
-    # 2. Migração de segurança: Se a tabela já existia sem a coluna tokens, adiciona ela agora.
-    cur.execute("PRAGMA table_info(chat_messages)")
-    columns = [row[1] for row in cur.fetchall()]
-    if "tokens" not in columns:
-        cur.execute("ALTER TABLE chat_messages ADD COLUMN tokens INTEGER DEFAULT 0")
+    # Migracoes em agents
+    cur.execute('PRAGMA table_info(agents)')
+    agent_cols = [row['name'] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
+    if 'description' not in agent_cols:
+        cur.execute('ALTER TABLE agents ADD COLUMN description TEXT')
+    if 'max_tokens' not in agent_cols:
+        cur.execute('ALTER TABLE agents ADD COLUMN max_tokens INTEGER NOT NULL DEFAULT 1024')
+    if 'temperature' not in agent_cols:
+        cur.execute('ALTER TABLE agents ADD COLUMN temperature REAL NOT NULL DEFAULT 0.7')
+    if 'system_prompt' not in agent_cols:
+        cur.execute('ALTER TABLE agents ADD COLUMN system_prompt TEXT')
+        if 'instructions' in agent_cols:
+            cur.execute('UPDATE agents SET system_prompt = instructions WHERE system_prompt IS NULL OR system_prompt = ""')
+    if 'created_at' not in agent_cols:
+        cur.execute("ALTER TABLE agents ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))")
+
+    # Migracao em chats
+    cur.execute('PRAGMA table_info(chats)')
+    chat_cols = [row['name'] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
+    if 'previous_response_id' not in chat_cols:
+        cur.execute('ALTER TABLE chats ADD COLUMN previous_response_id TEXT')
 
     conn.commit()
     conn.close()

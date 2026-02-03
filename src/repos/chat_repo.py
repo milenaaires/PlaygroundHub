@@ -58,3 +58,27 @@ def add_message(chat_id: int, role: str, content: str) -> None:
     )
     conn.commit()
     conn.close()
+
+
+
+def get_chat(chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, user_id, agent_id, title, previous_response_id, created_at FROM chats WHERE id = ? AND user_id = ?",
+        (chat_id, user_id),
+    )
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_previous_response_id(chat_id: int, user_id: int, previous_response_id: Optional[str]) -> None:
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE chats SET previous_response_id = ? WHERE id = ? AND user_id = ?",
+        (previous_response_id, chat_id, user_id),
+    )
+    conn.commit()
+    conn.close()
