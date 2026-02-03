@@ -57,6 +57,7 @@ def load_page(monkeypatch, page_path: Path, st: FakeStreamlit, *, users, update_
 
     ui_mod = types.ModuleType("src.core.ui")
     ui_mod.sidebar_status = lambda: None
+    ui_mod.page_header = lambda *a, **k: None
     monkeypatch.setitem(sys.modules, "src.core.ui", ui_mod)
 
     rbac_mod = types.ModuleType("src.auth.rbac")
@@ -81,7 +82,7 @@ def load_page(monkeypatch, page_path: Path, st: FakeStreamlit, *, users, update_
 
 def test_admin_cannot_deactivate_self(monkeypatch):
     root = Path(__file__).resolve().parents[1]
-    page = root / "pages" / "2_Admin.py"
+    page = root / "pages" / "2_⚙️_Admin.py"
 
     st = FakeStreamlit(session_state={"user_id": 1, "role": "ADMIN"})
     st._text_inputs["Buscar por e-mail"] = ""  # sem filtro
