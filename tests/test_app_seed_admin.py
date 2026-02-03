@@ -32,6 +32,7 @@ def test_seed_admin_creates_user_when_missing(monkeypatch):
 
     ui_mod = types.ModuleType("src.core.ui")
     ui_mod.sidebar_status = lambda: None
+    ui_mod.page_header = lambda *a, **k: None
     monkeypatch.setitem(sys.modules, "src.core.ui", ui_mod)
 
     calls = {"created": None}

@@ -1,0 +1,77 @@
+# =============================================================================
+# TEMA DO STREAMLIT - PlaygroundHub
+# =============================================================================
+# IMPORTANTE: As cores do tema so mudam apos REINICIAR o servidor.
+# Pare o Streamlit (Ctrl+C no terminal) e rode de novo: streamlit run app.py
+# So recarregar a pagina no navegador NAO aplica mudancas do config.toml.
+#
+# Edite as opcoes abaixo e reinicie o servidor para ver o resultado.
+# Documentacao: https://docs.streamlit.io/develop/concepts/configuration/theming
+# =============================================================================
+
+[theme]
+# Herdar do tema claro ou escuro do Streamlit (ou caminho para arquivo TOML externo)
+# Valores: "light" | "dark" | "caminho/para/theme.toml"
+base = "dark"
+
+# ---- Cores principais (afetam botões, links, destaques) ----
+# Cores: nome CSS, HEX (#rrggbb), rgb(r,g,b), hsl(h,s%,l%)
+primaryColor = "#E63946"
+backgroundColor = "#191E28"
+secondaryBackgroundColor = "#272B36"
+textColor = "#fafafa"
+[theme.sidebar]
+backgroundColor = "#1F242F"
+secondaryBackgroundColor = "#272B36"
+
+# ---- Links e código ----
+linkColor = "#83c9ff"
+codeTextColor = "#7defa1"
+codeBackgroundColor = "#262730"
+
+# ---- Fontes ----
+# Opções: "sans-serif" | "serif" | "monospace" | ou URL Google Fonts, ex.:
+# font = "Nunito:https://fonts.googleapis.com/css2?family=Nunito&display=swap"
+font = "sans-serif"
+headingFont = "sans-serif"
+codeFont = "monospace"
+
+# Tamanho e peso da fonte base (número em px para baseFontSize; 100-600 para baseFontWeight)
+# baseFontSize = 16
+# baseFontWeight = 400
+
+# ---- Bordas e cantos ----
+# baseRadius: "none" | "small" | "medium" | "large" | "full" | "0.5rem" | "8px"
+baseRadius = "medium"
+buttonRadius = "medium"
+borderColor = "rgba(250, 250, 250, 0.2)"
+
+# ---- Sidebar (opcional: sobrescreve apenas a barra lateral) ----
+# [theme.sidebar]
+# primaryColor = "#E63946"
+# backgroundColor = "#1e2129"
+# secondaryBackgroundColor = "#262730"
+# textColor = "#fafafa"
+
+# =============================================================================
+# TEMAS SEPARADOS: claro vs escuro (usuário escolhe no menu do app)
+# =============================================================================
+# Se quiser que o usuário alterne entre claro/escuro com aparências diferentes,
+# defina [theme.light] e [theme.dark] com as mesmas opções de [theme].
+# O [theme] acima define o padrão; theme.light e theme.dark sobrescrevem quando
+# o usuário troca no canto superior direito (Settings > Theme).
+# =============================================================================
+
+# [theme.light]
+# base = "light"
+# primaryColor = "#c62828"
+# backgroundColor = "#ffffff"
+# secondaryBackgroundColor = "#f0f2f6"
+# textColor = "#31333f"
+
+# [theme.dark]
+# base = "dark"
+# primaryColor = "#E63946"
+# backgroundColor = "#0e1117"
+# secondaryBackgroundColor = "#262730"
+# textColor = "#fafafa"
