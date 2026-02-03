@@ -48,7 +48,8 @@ def init_db():
         agent_id INTEGER NOT NULL REFERENCES agents(id),
         title TEXT NOT NULL,
         previous_response_id TEXT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     ''')
 
@@ -65,9 +66,16 @@ def init_db():
         chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
         role TEXT NOT NULL,
         content TEXT NOT NULL,
+        tokens INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     ''')
+
+    # Migracao em chat_messages (tokens)
+    cur.execute('PRAGMA table_info(chat_messages)')
+    msg_cols = [row['name'] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
+    if 'tokens' not in msg_cols:
+        cur.execute('ALTER TABLE chat_messages ADD COLUMN tokens INTEGER NOT NULL DEFAULT 0')
 
     # Migracoes em agents
     cur.execute('PRAGMA table_info(agents)')
@@ -90,6 +98,8 @@ def init_db():
     chat_cols = [row['name'] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
     if 'previous_response_id' not in chat_cols:
         cur.execute('ALTER TABLE chats ADD COLUMN previous_response_id TEXT')
+    if 'updated_at' not in chat_cols:
+        cur.execute("ALTER TABLE chats ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))")
 
     conn.commit()
     conn.close()

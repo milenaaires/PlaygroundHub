@@ -48,25 +48,19 @@ def carregar_dados_reais():
         return df
 
     # Enriquecimento dos dados (Processamento Python)
-    # 1. Identificar anexos (lógica simples baseada em texto, já que não temos tabela de arquivos)
-    df["Tem Anexo?"] = df["Conteúdo Completo"].str.contains(
-        r"uploaded:|\[FILE\]", case=False, regex=True
-    )
-
-    # 2. Calcular Custo
+    # 1. Calcular Custo
     df["Custo ($)"] = df.apply(calcular_custo, axis=1)
 
-    # 3. Categorização Simples (Dummy Logic)
-    # Num cenário real, você passaria isso num LLM. Aqui vamos por palavras-chave.
-    def categorizar(txt):
-        txt = txt.lower()
-        if "def " in txt or "class " in txt or "code" in txt:
-            return "Review de Código"
-        if "translate" in txt or "traduza" in txt:
-            return "Tradução"
-        return "Geral/Dúvida"
-
-    df["Categoria (IA)"] = df["Conteúdo Completo"].apply(categorizar)
+    # 2. Garantir colunas esperadas (quando o repo já retorna dados tratados)
+    if "Tem Anexo?" not in df.columns:
+        df["Tem Anexo?"] = False
+    if "Categoria (IA)" not in df.columns:
+        df["Categoria (IA)"] = "Geral/Dúvida"
+    if "Resumo" not in df.columns and "Conteúdo Completo" in df.columns:
+        df["Resumo"] = df["Conteúdo Completo"].fillna("").apply(
+            lambda txt: f"Mensagem com {len(str(txt).split())} palavras e {len(str(txt))} caracteres."
+        )
+        df = df.drop(columns=["Conteúdo Completo"])
 
     return df
 
@@ -98,7 +92,7 @@ def mostrar_detalhes(row_data, full_df):
     col1, col2 = st.columns([2, 1])
     with col1:
         st.markdown("**📝 Prompt do Usuário:**")
-        st.info(row_data["Conteúdo Completo"])
+        st.info(row_data["Resumo"])
         st.caption(f"Modelo Utilizado: `{row_data['Modelo']}`")
 
     with col2:
@@ -154,8 +148,8 @@ event = st.dataframe(
         "Tokens": st.column_config.ProgressColumn(
             format="%d", min_value=0, max_value=8000
         ),
-        "Conteúdo Completo": st.column_config.TextColumn(
-            width="small", label="Preview"
+        "Resumo": st.column_config.TextColumn(
+            width="small", label="Resumo"
         ),
         "id": None,  # Esconde IDs
         "Modelo": None,

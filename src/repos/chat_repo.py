@@ -24,14 +24,14 @@ def list_chats(user_id: int, agent_id: int) -> List[Dict[str, Any]]:
     conn = connect()
     cur = conn.cursor()
     cur.execute(
-        """SELECT id, title, created_at FROM chats
-           WHERE user_id = ? AND agent_id = ? ORDER BY created_at DESC""",
+        """SELECT id, title, created_at, updated_at FROM chats
+           WHERE user_id = ? AND agent_id = ? ORDER BY updated_at DESC, created_at DESC""",
         (user_id, agent_id),
     )
     rows = cur.fetchall()
     conn.close()
     return [
-        {"id": r["id"], "title": r["title"], "created_at": r["created_at"]}
+        {"id": r["id"], "title": r["title"], "created_at": r["created_at"], "updated_at": r["updated_at"]}
         for r in rows
     ]
 
@@ -41,21 +41,26 @@ def get_messages(chat_id: int) -> List[Dict[str, Any]]:
     conn = connect()
     cur = conn.cursor()
     cur.execute(
-        "SELECT role, content FROM chat_messages WHERE chat_id = ? ORDER BY id",
+        "SELECT role, content, tokens FROM chat_messages WHERE chat_id = ? ORDER BY id",
         (chat_id,),
     )
     rows = cur.fetchall()
     conn.close()
-    return [{"role": r["role"], "content": r["content"]} for r in rows]
+    return [{"role": r["role"], "content": r["content"], "tokens": r["tokens"]} for r in rows]
 
 
-def add_message(chat_id: int, role: str, content: str) -> None:
+def add_message(chat_id: int, role: str, content: str, tokens: Optional[int] = None) -> None:
     conn = connect()
     cur = conn.cursor()
+    try:
+        tokens_value = int(tokens) if tokens is not None else 0
+    except (TypeError, ValueError):
+        tokens_value = 0
     cur.execute(
-        "INSERT INTO chat_messages (chat_id, role, content) VALUES (?, ?, ?)",
-        (chat_id, role, content),
+        "INSERT INTO chat_messages (chat_id, role, content, tokens) VALUES (?, ?, ?, ?)",
+        (chat_id, role, content, tokens_value),
     )
+    cur.execute("UPDATE chats SET updated_at = datetime('now') WHERE id = ?", (chat_id,))
     conn.commit()
     conn.close()
 
@@ -65,7 +70,7 @@ def get_chat(chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     conn = connect()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, user_id, agent_id, title, previous_response_id, created_at FROM chats WHERE id = ? AND user_id = ?",
+        "SELECT id, user_id, agent_id, title, previous_response_id, created_at, updated_at FROM chats WHERE id = ? AND user_id = ?",
         (chat_id, user_id),
     )
     row = cur.fetchone()
@@ -79,6 +84,32 @@ def update_previous_response_id(chat_id: int, user_id: int, previous_response_id
     cur.execute(
         "UPDATE chats SET previous_response_id = ? WHERE id = ? AND user_id = ?",
         (previous_response_id, chat_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def rename_chat(chat_id: int, user_id: int, title: str) -> None:
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE chats SET title = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?",
+        (title, chat_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_chat(chat_id: int, user_id: int) -> None:
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM chat_messages WHERE chat_id = ?",
+        (chat_id,),
+    )
+    cur.execute(
+        "DELETE FROM chats WHERE id = ? AND user_id = ?",
+        (chat_id, user_id),
     )
     conn.commit()
     conn.close()

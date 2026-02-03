@@ -50,7 +50,7 @@ def run_agent_chat(
     user_text: str,
     previous_response_id: Optional[str] = None,
     file_id: Optional[str] = None,
-) -> Tuple[str, str]:
+) -> Tuple[str, str, Dict[str, Optional[int]]]:
     if not user_text:
         raise ValueError('Mensagem vazia.')
 
@@ -90,4 +90,12 @@ def run_agent_chat(
 
     client = get_openai_client()
     response = client.responses.create(**payload)
-    return response.output_text, response.id
+    usage = {}
+    usage_obj = getattr(response, 'usage', None)
+    if usage_obj:
+        usage = {
+            'input_tokens': getattr(usage_obj, 'input_tokens', None),
+            'output_tokens': getattr(usage_obj, 'output_tokens', None),
+            'total_tokens': getattr(usage_obj, 'total_tokens', None),
+        }
+    return response.output_text, response.id, usage
