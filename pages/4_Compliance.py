@@ -1,87 +1,86 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# --- IMPORTS DO PROJETO (src) ---
-# Tenta importar a UI padrão do seu time. Se der erro (testando local), ignora.
+# --- IMPORTS DO PROJETO ---
 try:
     from src.core.ui import sidebar_status
+    from src.repos.compliance_repo import (
+        get_compliance_data,
+    )  # <--- Importando o repo real
 except ImportError:
-    # Função dummy caso você esteja testando fora da estrutura do projeto
-    def sidebar_status():
-        st.sidebar.info("Modo de Teste (Sem src.core.ui)")
-
+    st.error(
+        "Erro de importação. Verifique se o arquivo src/repos/compliance_repo.py existe."
+    )
+    st.stop()
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
-# Em multipage apps, isso define o título da aba do navegador para ESTA página
 st.set_page_config(page_title="Compliance & Auditoria", page_icon="🛡️", layout="wide")
-
-# --- 2. INTEGRAÇÃO COM SIDEBAR DO TIME ---
-# Chama a função que exibe o status do usuário na barra lateral (igual ao app.py)
 sidebar_status()
 
-# --- 3. TÍTULO E CABEÇALHO ---
 st.title("🛡️ Painel de Compliance")
-st.markdown("Auditoria de prompts, análise de custos e verificação de segurança.")
+st.markdown("Auditoria de prompts reais extraídos do banco de dados `app.db`.")
 st.divider()
 
 
-# --- 4. CAMADA DE DADOS (MOCK) ---
-# Mantenha o mock até seu colega liberar a query do banco
-@st.cache_data
-def carregar_dados_mock():
-    usuarios = [
-        "alice@empresa.com",
-        "bob@empresa.com",
-        "carol@empresa.com",
-        "dave@dev.com",
-    ]
-    categorias_possiveis = [
-        "Review de Código",
-        "Tradução",
-        "Criação de Content",
-        "Dúvida Técnica",
-    ]
+# --- 2. FUNÇÃO DE CUSTO ---
+def calcular_custo(row):
+    # Preços estimados por token (Input) - Exemplo
+    # Você pode ajustar esses valores conforme a tabela da OpenAI/Anthropic
+    model = str(row["Modelo"]).lower()
+    tokens = row["Tokens"]
 
-    dados = []
-    data_hoje = datetime.now()
-
-    for i in range(50):
-        data_rand = data_hoje - timedelta(days=np.random.randint(0, 30))
-        usuario = np.random.choice(usuarios)
-        tokens = np.random.randint(50, 4000)
-        tem_anexo = np.random.choice([True, False], p=[0.2, 0.8])
-        categoria = np.random.choice(categorias_possiveis)
-
-        # Simulando texto
-        if categoria == "Review de Código":
-            full_text = f"Review requested by {usuario}:\ndef process(x): return x*2..."
-        elif categoria == "Tradução":
-            full_text = "Translate the attached legal doc..."
-        else:
-            full_text = "How do I access the VPN?"
-
-        dados.append(
-            {
-                "ID": i,
-                "Data/Hora": data_rand,
-                "Usuário": usuario,
-                "Tokens": tokens,
-                "Custo ($)": tokens * 0.00002,
-                "Tem Anexo?": tem_anexo,
-                "Categoria (IA)": categoria,
-                "Conteúdo Completo": full_text,
-            }
-        )
-
-    return pd.DataFrame(dados)
+    if "gpt-4" in model:
+        return tokens * (2.50 / 1_000_000)  # Ex: $2.50 por 1M tokens
+    elif "gpt-3.5" in model:
+        return tokens * (0.50 / 1_000_000)
+    else:
+        return tokens * (0.20 / 1_000_000)  # Preço genérico
 
 
-df = carregar_dados_mock()
+# --- 3. CAMADA DE DADOS (REAL) ---
+@st.cache_data(ttl=60)  # Cache de 60 segundos para não ficar lento
+def carregar_dados_reais():
+    df = get_compliance_data()
+
+    if df.empty:
+        return df
+
+    # Enriquecimento dos dados (Processamento Python)
+    # 1. Identificar anexos (lógica simples baseada em texto, já que não temos tabela de arquivos)
+    df["Tem Anexo?"] = df["Conteúdo Completo"].str.contains(
+        r"uploaded:|\[FILE\]", case=False, regex=True
+    )
+
+    # 2. Calcular Custo
+    df["Custo ($)"] = df.apply(calcular_custo, axis=1)
+
+    # 3. Categorização Simples (Dummy Logic)
+    # Num cenário real, você passaria isso num LLM. Aqui vamos por palavras-chave.
+    def categorizar(txt):
+        txt = txt.lower()
+        if "def " in txt or "class " in txt or "code" in txt:
+            return "Review de Código"
+        if "translate" in txt or "traduza" in txt:
+            return "Tradução"
+        return "Geral/Dúvida"
+
+    df["Categoria (IA)"] = df["Conteúdo Completo"].apply(categorizar)
+
+    return df
 
 
-# --- 5. FUNÇÃO DO POPUP (DIALOG) ---
+df = carregar_dados_reais()
+
+if df.empty:
+    st.warning(
+        "Nenhum dado encontrado no banco de dados. Comece a usar o chat para gerar registros."
+    )
+    st.stop()
+
+
+# --- 4. FUNÇÃO DO POPUP ---
 @st.dialog("Detalhes da Auditoria", width="large")
 def mostrar_detalhes(row_data, full_df):
     col_a, col_b = st.columns(2)
@@ -90,46 +89,47 @@ def mostrar_detalhes(row_data, full_df):
         st.subheader(row_data["Usuário"])
     with col_b:
         st.caption("Data")
-        st.subheader(pd.to_datetime(row_data["Data/Hora"]).strftime("%d/%m/%Y %H:%M"))
+        # Garante que é timestamp antes de formatar
+        ts = pd.to_datetime(row_data["Data/Hora"])
+        st.subheader(ts.strftime("%d/%m/%Y %H:%M"))
 
     st.divider()
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.markdown("**📝 Teor da Conversa:**")
+        st.markdown("**📝 Prompt do Usuário:**")
         st.info(row_data["Conteúdo Completo"])
+        st.caption(f"Modelo Utilizado: `{row_data['Modelo']}`")
 
     with col2:
-        st.markdown("**Metadados:**")
+        st.markdown("**Métricas:**")
         if row_data["Tem Anexo?"]:
-            st.warning("⚠️ Contém Anexo")
+            st.warning("⚠️ Contém Referência a Arquivo")
         else:
-            st.success("Sem anexos")
-        st.metric("Tokens", row_data["Tokens"])
-        st.metric("Custo", f"$ {row_data['Custo ($)']:.4f}")
+            st.success("Texto Puro")
+
+        st.metric("Tokens (Input)", row_data["Tokens"])
+        st.metric("Custo Estimado", f"$ {row_data['Custo ($)']:.6f}")
 
     st.divider()
-    st.subheader(f"📈 Uso Recente: {row_data['Usuário']}")
+    st.subheader(f"📈 Atividade Recente: {row_data['Usuário']}")
     user_history = full_df[full_df["Usuário"] == row_data["Usuário"]].copy()
     user_history["Data"] = pd.to_datetime(user_history["Data/Hora"]).dt.date
     daily_usage = user_history.groupby("Data")["Tokens"].sum().reset_index()
     st.bar_chart(daily_usage, x="Data", y="Tokens", color="#FF4B4B")
 
 
-# --- 6. FILTROS ---
+# --- 5. FILTROS ---
 with st.sidebar:
-    st.header("🔍 Filtros")  # Adicionado dentro do contexto sidebar para organizar
-    usuarios_selecionados = st.multiselect(
-        "Usuários", options=df["Usuário"].unique(), default=df["Usuário"].unique()
-    )
-    data_inicio = st.date_input("Início", value=df["Data/Hora"].min())
+    st.header("🔍 Filtros DB")
+    usuarios_selecionados = st.multiselect("Usuários", options=df["Usuário"].unique())
+
+    min_date = df["Data/Hora"].min().date()
+    data_inicio = st.date_input("Início", value=min_date)
     data_fim = st.date_input("Fim", value=datetime.now())
-    apenas_com_anexos = st.checkbox("Com anexos")
 
-# Aplicação dos filtros
+# Aplicação
 df_filtrado = df.copy()
-df_filtrado["Data/Hora"] = pd.to_datetime(df_filtrado["Data/Hora"])
-
 if usuarios_selecionados:
     df_filtrado = df_filtrado[df_filtrado["Usuário"].isin(usuarios_selecionados)]
 
@@ -138,32 +138,34 @@ df_filtrado = df_filtrado[
     & (df_filtrado["Data/Hora"].dt.date <= data_fim)
 ]
 
-if apenas_com_anexos:
-    df_filtrado = df_filtrado[df_filtrado["Tem Anexo?"] == True]
+# --- 6. TABELA ---
+st.subheader("📋 Auditoria de Prompts (Live DB)")
 
-# --- 7. TABELA ---
-st.subheader("📋 Histórico de Prompts")
 event = st.dataframe(
     df_filtrado,
     width="stretch",
     on_select="rerun",
     selection_mode="single-row",
     column_config={
-        "Data/Hora": st.column_config.DatetimeColumn(format="DD/MM/YYYY HH:mm"),
-        "Custo ($)": st.column_config.NumberColumn(format="$ %.4f"),
+        "Data/Hora": st.column_config.DatetimeColumn(format="DD/MM/YY HH:mm"),
+        "Custo ($)": st.column_config.NumberColumn(format="$ %.6f"),
         "Tem Anexo?": st.column_config.CheckboxColumn(label="📎"),
+        "Categoria (IA)": st.column_config.TextColumn(),
         "Tokens": st.column_config.ProgressColumn(
-            format="%d", min_value=0, max_value=4000
+            format="%d", min_value=0, max_value=8000
         ),
         "Conteúdo Completo": st.column_config.TextColumn(
             width="small", label="Preview"
         ),
-        "ID": None,
+        "id": None,  # Esconde IDs
+        "Modelo": None,
+        "role": None,
     },
     hide_index=True,
 )
 
 if len(event.selection.rows) > 0:
     selected_index = event.selection.rows[0]
+    # Atenção: pegar pelo índice correto do dataframe filtrado
     selected_row = df_filtrado.iloc[selected_index]
     mostrar_detalhes(selected_row, df)
