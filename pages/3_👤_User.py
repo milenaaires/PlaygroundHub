@@ -18,16 +18,15 @@ from src.repos.chat_repo import (
     rename_chat,
     delete_chat,
 )
-from src.agents.service import run_agent_chat
+from src.agents.service import run_agent_chat, upload_pdf
 from src.core.db import init_db
 
-from src.core.ui import sidebar_status
+from src.core.ui import sidebar_status, page_header
 
 sidebar_status()
-
 require_roles({ROLE_USER, ROLE_ADMIN})
 
-st.title("User")
+page_header("User", title="Área do usuário", subtitle="Configure agentes, acesse o chat e veja o histórico.")
 
 user_id = st.session_state.get("user_id")
 if user_id is None:
@@ -89,12 +88,22 @@ def _render_chat_config_and_messages(prefix=""):
         for msg in st.session_state.chat_messages:
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
+        pdf_file = st.file_uploader("Anexar PDF (opcional)", type=["pdf"], key=f"{prefix}pdf_upload")
         if prompt := st.chat_input("Digite sua mensagem...", key=f"{prefix}chat_input"):
             if not _ensure_openai_key():
                 if prefix == "popup_":
                     st.session_state["reopen_popup"] = "config"
                 st.rerun()
             st.session_state.chat_messages.append({"role": "user", "content": prompt})
+            file_id = None
+            if pdf_file:
+                try:
+                    file_id = upload_pdf(pdf_file)
+                except Exception as e:
+                    st.error(f"Erro ao enviar PDF: {e}")
+                    if prefix == "popup_":
+                        st.session_state["reopen_popup"] = "config"
+                    st.rerun()
             agent_cfg = {
                 "name": st.session_state.get(f"{prefix}agent_name", "Agent"),
                 "description": st.session_state.get(f"{prefix}agent_desc", ""),
@@ -111,6 +120,7 @@ def _render_chat_config_and_messages(prefix=""):
                         agent_cfg,
                         prompt,
                         previous_response_id=prev_id,
+                        file_id=file_id,
                     )
                 st.session_state.chat_messages.append({"role": "assistant", "content": reply})
                 st.session_state[prev_key] = resp_id
@@ -176,6 +186,7 @@ def _render_access_chat(prefix: str):
         for msg in messages:
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
+        pdf_conv = st.file_uploader("Anexar PDF (opcional)", type=["pdf"], key=f"{prefix}conv_pdf")
         if prompt := st.chat_input("Digite sua mensagem...", key=f"{prefix}input"):
             if not _ensure_openai_key():
                 if prefix == "access_popup_":
@@ -183,12 +194,22 @@ def _render_access_chat(prefix: str):
                 st.rerun()
             chat = get_chat(chat_id, user_id)
             prev_id = chat.get("previous_response_id") if chat else None
+            file_id = None
+            if pdf_conv:
+                try:
+                    file_id = upload_pdf(pdf_conv)
+                except Exception as e:
+                    st.error(f"Erro ao enviar PDF: {e}")
+                    if prefix == "access_popup_":
+                        st.session_state["reopen_popup"] = "access_chat"
+                    st.rerun()
             try:
                 with st.spinner("Consultando o agente..."):
                     reply, resp_id, usage = run_agent_chat(
                         agent,
                         prompt,
                         previous_response_id=prev_id,
+                        file_id=file_id,
                     )
                 input_tokens = usage.get("input_tokens") if usage else None
                 output_tokens = usage.get("output_tokens") if usage else None
@@ -203,7 +224,7 @@ def _render_access_chat(prefix: str):
 
     chats = list_chats(user_id, agent_id)
     if chats:
-        st.subheader("Hist?rico de chats")
+        st.subheader("Histórico de chats")
 
         rename_key = f"{prefix}rename_chat_id"
         rename_id = st.session_state.get(rename_key)
@@ -350,11 +371,20 @@ if _dialog_decorator is not None:
             for msg in st.session_state.edit_popup_chat_messages:
                 with st.chat_message(msg["role"]):
                     st.write(msg["content"])
+            pdf_edit = st.file_uploader("Anexar PDF (opcional)", type=["pdf"], key="edit_popup_pdf")
             if prompt := st.chat_input("Digite sua mensagem...", key="edit_popup_chat_input"):
                 if not _ensure_openai_key():
                     st.session_state["reopen_popup"] = "edit_agent"
                     st.rerun()
                 st.session_state.edit_popup_chat_messages.append({"role": "user", "content": prompt})
+                file_id = None
+                if pdf_edit:
+                    try:
+                        file_id = upload_pdf(pdf_edit)
+                    except Exception as e:
+                        st.error(f"Erro ao enviar PDF: {e}")
+                        st.session_state["reopen_popup"] = "edit_agent"
+                        st.rerun()
                 agent_cfg = {
                     "name": st.session_state.get("edit_popup_name", agent.get("name", "Agent")),
                     "description": st.session_state.get("edit_popup_desc", agent.get("description", "")),
@@ -371,6 +401,7 @@ if _dialog_decorator is not None:
                             agent_cfg,
                             prompt,
                             previous_response_id=prev_id,
+                            file_id=file_id,
                         )
                     st.session_state.edit_popup_chat_messages.append({"role": "assistant", "content": reply})
                     st.session_state[prev_key] = resp_id
