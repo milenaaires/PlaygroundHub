@@ -26,5 +26,44 @@ def init_db():
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     """)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS agents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        name TEXT NOT NULL,
+        description TEXT,
+        model TEXT NOT NULL,
+        max_tokens INTEGER NOT NULL,
+        temperature REAL NOT NULL,
+        system_prompt TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    """)
+    # Chats: uma conversa por agente (múltiplos chats por agente)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS chats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        agent_id INTEGER NOT NULL REFERENCES agents(id),
+        title TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    """)
+    # Migração: se chat_messages antiga (user_id, agent_id) existir, substituir pela nova (chat_id)
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chat_messages'")
+    if cur.fetchone():
+        cur.execute("PRAGMA table_info(chat_messages)")
+        cols = [row[1] for row in cur.fetchall()]
+        if "agent_id" in cols:
+            cur.execute("DROP TABLE chat_messages")
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    """)
     conn.commit()
     conn.close()
