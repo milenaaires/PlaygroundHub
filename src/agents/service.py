@@ -70,7 +70,11 @@ def run_agent_chat(
         'temperature': _to_float(agent.get('temperature'), default_temperature),
     }
 
-    instructions = agent.get('instructions') or ''
+    instructions = (
+        agent.get('system_prompt')
+        or agent.get('instructions')
+        or ''
+    )
     if instructions:
         payload['instructions'] = instructions
 

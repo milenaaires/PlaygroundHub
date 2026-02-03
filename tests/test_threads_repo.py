@@ -22,7 +22,7 @@ def setup_temp_db():
 def test_create_thread_and_update_previous_response():
     setup_temp_db()
     uid = create_user('t@a.com', 'pw123456', 'USER', True)
-    agent_id = create_agent(uid, 'Agent A', 'gpt-4.1-mini', 'instr', 0.7, None)
+    agent_id = create_agent(uid, 'Agent A', 'Desc A', 'gpt-4o-mini', 256, 0.7, 'Prompt A')
 
     thread_id = create_thread(uid, agent_id)
     t1 = get_thread(uid, thread_id)
@@ -40,7 +40,7 @@ def test_thread_user_isolation():
     setup_temp_db()
     uid1 = create_user('u1@a.com', 'pw123456', 'USER', True)
     uid2 = create_user('u2@a.com', 'pw123456', 'USER', True)
-    agent_id = create_agent(uid1, 'Agent A', 'gpt-4.1-mini', 'instr', 0.7, None)
+    agent_id = create_agent(uid1, 'Agent A', 'Desc A', 'gpt-4o-mini', 256, 0.7, 'Prompt A')
 
     thread_id = create_thread(uid1, agent_id)
 
