@@ -5,7 +5,7 @@ from datetime import datetime
 
 # --- IMPORTS DO PROJETO ---
 try:
-    from src.core.ui import sidebar_status
+    from src.core.ui import sidebar_status, page_header
     from src.repos.compliance_repo import (
         get_compliance_data,
     )  # <--- Importando o repo real
@@ -18,9 +18,7 @@ except ImportError:
 # --- 1. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Compliance & Auditoria", page_icon="🛡️", layout="wide")
 sidebar_status()
-
-st.title("🛡️ Painel de Compliance")
-st.markdown("Auditoria de prompts reais extraídos do banco de dados `app.db`.")
+page_header("Compliance", title="Painel de Compliance", subtitle="Auditoria de prompts reais extraídos do banco de dados.")
 st.divider()
 
 

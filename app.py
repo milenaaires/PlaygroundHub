@@ -1,10 +1,9 @@
-from pathlib import Path
 import streamlit as st
 
 from src.core.db import init_db
 from src.core.config import get_settings
 from src.repos.users_repo import get_user_by_email, create_user
-from src.core.ui import sidebar_status
+from src.core.ui import sidebar_status, page_header
 
 # ✅ TEM que ser a primeira coisa do Streamlit
 st.set_page_config(
@@ -30,17 +29,6 @@ ensure_admin()
 # --- Sidebar status (uma vez só) ---
 sidebar_status()
 
-# --- Header (logo pequena + nome ao lado) ---
-logo_path = Path("assets/Logo.png")
-col1, col2 = st.columns([1, 8], vertical_alignment="center")
-
-with col1:
-    if logo_path.exists():
-        st.image(str(logo_path), width=56)
-
-with col2:
-    st.markdown("## PlaygroundHub")
-    st.caption("Playground corporativo com controle, papéis e auditoria.")
-
-st.divider()
+# --- Menu superior: breadcrumb (PlaygroundHub > Início) + título ---
+page_header("Início", title="PlaygroundHub", subtitle="Playground corporativo com controle, papéis e auditoria.")
 st.write("Use o menu lateral para navegar.")

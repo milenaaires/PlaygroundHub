@@ -105,9 +105,8 @@ def init_db():
                 'UPDATE agents SET system_prompt = instructions WHERE system_prompt IS NULL OR system_prompt = ""'
             )
     if "created_at" not in agent_cols:
-        cur.execute(
-            "ALTER TABLE agents ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))"
-        )
+        cur.execute("ALTER TABLE agents ADD COLUMN created_at TEXT DEFAULT ''")
+        cur.execute("UPDATE agents SET created_at = datetime('now') WHERE created_at = '' OR created_at IS NULL")
 
     # Migracao em chats
     cur.execute('PRAGMA table_info(chats)')
@@ -115,7 +114,8 @@ def init_db():
     if 'previous_response_id' not in chat_cols:
         cur.execute('ALTER TABLE chats ADD COLUMN previous_response_id TEXT')
     if 'updated_at' not in chat_cols:
-        cur.execute("ALTER TABLE chats ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))")
+        cur.execute("ALTER TABLE chats ADD COLUMN updated_at TEXT DEFAULT ''")
+        cur.execute("UPDATE chats SET updated_at = datetime('now') WHERE updated_at = '' OR updated_at IS NULL")
 
     conn.commit()
     conn.close()
