@@ -145,3 +145,30 @@ def delete_chat(chat_id: int, user_id: int) -> None:
     )
     conn.commit()
     conn.close()
+
+
+def add_chat_test_message(
+    user_id: int,
+    role: str,
+    content: str,
+    agent_id: Optional[int] = None,
+    tokens: Optional[int] = None,
+    has_attachment: bool = False,
+    attachment_filename: Optional[str] = None,
+    model: Optional[str] = None,
+    agent_name: Optional[str] = None,
+) -> None:
+    """Persiste mensagem do Chat Testes para auditoria no Compliance."""
+    conn = connect()
+    cur = conn.cursor()
+    tokens_val = int(tokens) if tokens is not None else 0
+    fn = (attachment_filename or "").strip() or None
+    if fn:
+        fn = Path(fn.replace("\\", "/")).name[:200] or None
+    cur.execute(
+        """INSERT INTO chat_test_messages (user_id, agent_id, role, content, tokens, has_attachment, attachment_filename, model, agent_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (user_id, agent_id, role, content, tokens_val, 1 if has_attachment else 0, fn, model, agent_name),
+    )
+    conn.commit()
+    conn.close()

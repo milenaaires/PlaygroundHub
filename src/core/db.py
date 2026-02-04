@@ -126,5 +126,26 @@ def init_db():
         cur.execute("ALTER TABLE chats ADD COLUMN updated_at TEXT DEFAULT ''")
         cur.execute("UPDATE chats SET updated_at = datetime('now') WHERE updated_at = '' OR updated_at IS NULL")
 
+    # Tabela de mensagens do Chat Testes (Configurar Agente / Editar agente) para auditoria
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS chat_test_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        agent_id INTEGER REFERENCES agents(id),
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        tokens INTEGER NOT NULL DEFAULT 0,
+        has_attachment INTEGER NOT NULL DEFAULT 0,
+        attachment_filename TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    """)
+    cur.execute("PRAGMA table_info(chat_test_messages)")
+    test_cols = [row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
+    if "model" not in test_cols:
+        cur.execute("ALTER TABLE chat_test_messages ADD COLUMN model TEXT")
+    if "agent_name" not in test_cols:
+        cur.execute("ALTER TABLE chat_test_messages ADD COLUMN agent_name TEXT")
+
     conn.commit()
     conn.close()

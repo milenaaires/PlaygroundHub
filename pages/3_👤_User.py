@@ -11,6 +11,7 @@ from src.repos.agents_repo import (
 from src.repos.chat_repo import (
     get_messages,
     add_message,
+    add_chat_test_message,
     create_chat,
     list_chats,
     get_chat,
@@ -125,11 +126,51 @@ def _render_chat_config_and_messages(prefix=""):
                     )
                 st.session_state.chat_messages.append({"role": "assistant", "content": reply})
                 st.session_state[prev_key] = resp_id
+                input_tok = _usage.get("input_tokens") if _usage else None
+                output_tok = _usage.get("output_tokens") if _usage else None
+                add_chat_test_message(
+                    user_id=user_id,
+                    role="user",
+                    content=prompt,
+                    agent_id=None,
+                    tokens=input_tok,
+                    has_attachment=bool(file_id),
+                    attachment_filename=pdf_file.name if pdf_file else None,
+                    model=agent_cfg.get("model"),
+                    agent_name=agent_cfg.get("name"),
+                )
+                add_chat_test_message(
+                    user_id=user_id,
+                    role="assistant",
+                    content=reply,
+                    agent_id=None,
+                    tokens=output_tok,
+                    model=agent_cfg.get("model"),
+                    agent_name=agent_cfg.get("name"),
+                )
             except Exception as e:
                 st.session_state.chat_messages.append({
                     "role": "assistant",
                     "content": f"Erro ao consultar o modelo: {e}",
                 })
+                add_chat_test_message(
+                    user_id=user_id,
+                    role="user",
+                    content=prompt,
+                    agent_id=None,
+                    has_attachment=bool(file_id),
+                    attachment_filename=pdf_file.name if pdf_file else None,
+                    model=agent_cfg.get("model"),
+                    agent_name=agent_cfg.get("name"),
+                )
+                add_chat_test_message(
+                    user_id=user_id,
+                    role="assistant",
+                    content=f"Erro ao consultar o modelo: {e}",
+                    agent_id=None,
+                    model=agent_cfg.get("model"),
+                    agent_name=agent_cfg.get("name"),
+                )
             if prefix == "popup_":
                 st.session_state["reopen_popup"] = "config"
             st.rerun()
@@ -430,11 +471,51 @@ if _dialog_decorator is not None:
                         )
                     st.session_state.edit_popup_chat_messages.append({"role": "assistant", "content": reply})
                     st.session_state[prev_key] = resp_id
+                    input_tok = _usage.get("input_tokens") if _usage else None
+                    output_tok = _usage.get("output_tokens") if _usage else None
+                    add_chat_test_message(
+                        user_id=user_id,
+                        role="user",
+                        content=prompt,
+                        agent_id=agent["id"],
+                        tokens=input_tok,
+                        has_attachment=bool(pdf_edit),
+                        attachment_filename=pdf_edit.name if pdf_edit else None,
+                        model=agent_cfg.get("model"),
+                        agent_name=agent_cfg.get("name"),
+                    )
+                    add_chat_test_message(
+                        user_id=user_id,
+                        role="assistant",
+                        content=reply,
+                        agent_id=agent["id"],
+                        tokens=output_tok,
+                        model=agent_cfg.get("model"),
+                        agent_name=agent_cfg.get("name"),
+                    )
                 except Exception as e:
                     st.session_state.edit_popup_chat_messages.append({
                         "role": "assistant",
                         "content": f"Erro ao consultar o modelo: {e}",
                     })
+                    add_chat_test_message(
+                        user_id=user_id,
+                        role="user",
+                        content=prompt,
+                        agent_id=agent["id"],
+                        has_attachment=bool(pdf_edit),
+                        attachment_filename=pdf_edit.name if pdf_edit else None,
+                        model=agent_cfg.get("model"),
+                        agent_name=agent_cfg.get("name"),
+                    )
+                    add_chat_test_message(
+                        user_id=user_id,
+                        role="assistant",
+                        content=f"Erro ao consultar o modelo: {e}",
+                        agent_id=agent["id"],
+                        model=agent_cfg.get("model"),
+                        agent_name=agent_cfg.get("name"),
+                    )
                 st.session_state["reopen_popup"] = "edit_agent"
                 st.rerun()
 
