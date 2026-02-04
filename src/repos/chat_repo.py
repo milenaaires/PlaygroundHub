@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from ..core.db import connect
 
@@ -7,11 +8,12 @@ def create_chat(user_id: int, agent_id: int, title: Optional[str] = None) -> int
     """Cria um novo chat para o agente. title opcional (ex.: 'Chat 02/02/2025')."""
     if not title:
         title = f"Chat {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    default_topic_summary = "Novo chat iniciado."
     conn = connect()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO chats (user_id, agent_id, title) VALUES (?, ?, ?)",
-        (user_id, agent_id, title),
+        "INSERT INTO chats (user_id, agent_id, title, conversation_topic_summary) VALUES (?, ?, ?, ?)",
+        (user_id, agent_id, title, default_topic_summary),
     )
     conn.commit()
     chat_id = cur.lastrowid
@@ -49,16 +51,28 @@ def get_messages(chat_id: int) -> List[Dict[str, Any]]:
     return [{"role": r["role"], "content": r["content"], "tokens": r["tokens"]} for r in rows]
 
 
-def add_message(chat_id: int, role: str, content: str, tokens: Optional[int] = None) -> None:
+def add_message(
+    chat_id: int,
+    role: str,
+    content: str,
+    tokens: Optional[int] = None,
+    has_attachment: Optional[bool] = None,
+    attachment_filename: Optional[str] = None,
+) -> None:
     conn = connect()
     cur = conn.cursor()
     try:
         tokens_value = int(tokens) if tokens is not None else 0
     except (TypeError, ValueError):
         tokens_value = 0
+
+    filename_value = (attachment_filename or "").strip() or None
+    if filename_value:
+        filename_value = Path(filename_value).name[:200]
+    has_attachment_value = bool(has_attachment) if has_attachment is not None else bool(filename_value)
     cur.execute(
-        "INSERT INTO chat_messages (chat_id, role, content, tokens) VALUES (?, ?, ?, ?)",
-        (chat_id, role, content, tokens_value),
+        "INSERT INTO chat_messages (chat_id, role, content, tokens, has_attachment, attachment_filename) VALUES (?, ?, ?, ?, ?, ?)",
+        (chat_id, role, content, tokens_value, 1 if has_attachment_value else 0, filename_value),
     )
     cur.execute("UPDATE chats SET updated_at = datetime('now') WHERE id = ?", (chat_id,))
     conn.commit()
@@ -70,12 +84,27 @@ def get_chat(chat_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     conn = connect()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, user_id, agent_id, title, previous_response_id, created_at, updated_at FROM chats WHERE id = ? AND user_id = ?",
+        "SELECT id, user_id, agent_id, title, conversation_topic_summary, previous_response_id, created_at, updated_at FROM chats WHERE id = ? AND user_id = ?",
         (chat_id, user_id),
     )
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def update_conversation_topic_summary(
+    chat_id: int,
+    user_id: int,
+    conversation_topic_summary: Optional[str],
+) -> None:
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE chats SET conversation_topic_summary = ? WHERE id = ? AND user_id = ?",
+        (conversation_topic_summary, chat_id, user_id),
+    )
+    conn.commit()
+    conn.close()
 
 
 def update_previous_response_id(chat_id: int, user_id: int, previous_response_id: Optional[str]) -> None:

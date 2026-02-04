@@ -97,6 +97,9 @@ def mostrar_detalhes(row_data, full_df):
         st.markdown("**Métricas:**")
         if row_data["Tem Anexo?"]:
             st.warning("⚠️ Contém Referência a Arquivo")
+            attachment_name = row_data.get("Arquivo")
+            if isinstance(attachment_name, str) and attachment_name.strip():
+                st.caption(f"Arquivo: `{attachment_name.strip()}`")
         else:
             st.success("Texto Puro")
 
@@ -152,6 +155,7 @@ event = st.dataframe(
         "id": None,  # Esconde IDs
         "Modelo": None,
         "role": None,
+        "Arquivo": None,
     },
     hide_index=True,
 )

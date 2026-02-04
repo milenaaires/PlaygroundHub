@@ -15,10 +15,11 @@ from src.repos.chat_repo import (
     list_chats,
     get_chat,
     update_previous_response_id,
+    update_conversation_topic_summary,
     rename_chat,
     delete_chat,
 )
-from src.agents.service import run_agent_chat, upload_pdf
+from src.agents.service import run_agent_chat, upload_pdf, generate_compliance_summary
 from src.core.db import init_db
 
 from src.core.ui import sidebar_status, page_header
@@ -213,9 +214,33 @@ def _render_access_chat(prefix: str):
                     )
                 input_tokens = usage.get("input_tokens") if usage else None
                 output_tokens = usage.get("output_tokens") if usage else None
-                add_message(chat_id, "user", prompt, tokens=input_tokens)
+                attachment_name = getattr(pdf_conv, "name", None) if file_id else None
+                add_message(
+                    chat_id,
+                    "user",
+                    prompt,
+                    tokens=input_tokens,
+                    has_attachment=bool(file_id),
+                    attachment_filename=attachment_name,
+                )
                 add_message(chat_id, "assistant", reply, tokens=output_tokens)
                 update_previous_response_id(chat_id, user_id, resp_id)
+
+                # Persistimos apenas um resumo temático (sem PII/sem trechos verbatim) por chat para Compliance.
+                try:
+                    topic_summary = generate_compliance_summary(
+                        (messages or [])
+                        + [
+                            {"role": "user", "content": prompt},
+                            {"role": "assistant", "content": reply},
+                        ]
+                    )
+                except Exception:
+                    topic_summary = "(resumo indisponível)"
+                try:
+                    update_conversation_topic_summary(chat_id, user_id, topic_summary)
+                except Exception:
+                    pass
             except Exception as e:
                 st.error(f"Erro ao consultar o modelo: {e}")
             if prefix == "access_popup_":

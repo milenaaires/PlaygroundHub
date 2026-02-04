@@ -50,6 +50,7 @@ def init_db():
         user_id INTEGER NOT NULL REFERENCES users(id),
         agent_id INTEGER NOT NULL REFERENCES agents(id),
         title TEXT NOT NULL,
+        conversation_topic_summary TEXT,
         previous_response_id TEXT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -72,6 +73,8 @@ def init_db():
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         tokens INTEGER NOT NULL DEFAULT 0,
+        has_attachment INTEGER NOT NULL DEFAULT 0,
+        attachment_filename TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     """)
@@ -81,6 +84,10 @@ def init_db():
     msg_cols = [row['name'] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
     if 'tokens' not in msg_cols:
         cur.execute('ALTER TABLE chat_messages ADD COLUMN tokens INTEGER NOT NULL DEFAULT 0')
+    if 'has_attachment' not in msg_cols:
+        cur.execute('ALTER TABLE chat_messages ADD COLUMN has_attachment INTEGER NOT NULL DEFAULT 0')
+    if 'attachment_filename' not in msg_cols:
+        cur.execute('ALTER TABLE chat_messages ADD COLUMN attachment_filename TEXT')
 
     # Migracoes em agents
     cur.execute("PRAGMA table_info(agents)")
@@ -111,6 +118,8 @@ def init_db():
     # Migracao em chats
     cur.execute('PRAGMA table_info(chats)')
     chat_cols = [row['name'] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
+    if 'conversation_topic_summary' not in chat_cols:
+        cur.execute('ALTER TABLE chats ADD COLUMN conversation_topic_summary TEXT')
     if 'previous_response_id' not in chat_cols:
         cur.execute('ALTER TABLE chats ADD COLUMN previous_response_id TEXT')
     if 'updated_at' not in chat_cols:

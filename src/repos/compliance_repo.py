@@ -15,10 +15,12 @@ def get_compliance_data():
         m.id,
         m.created_at as "Data/Hora",
         u.email as "Usuário",
-        m.content as "Conteúdo Completo",
+        c.conversation_topic_summary as "Resumo",
         m.tokens as "Tokens",
         a.model as "Modelo",
-        m.role
+        m.role,
+        m.has_attachment as "Tem Anexo?",
+        m.attachment_filename as "Arquivo"
     FROM chat_messages m
     JOIN chats c ON m.chat_id = c.id
     JOIN users u ON c.user_id = u.id
@@ -45,20 +47,13 @@ def get_compliance_data():
                 return "Tradução"
             return "Geral/Dúvida"
 
-        def _resumo(txt: str) -> str:
-            txt = txt or ""
-            words = len(txt.split())
-            chars = len(txt)
-            return f"Mensagem com {words} palavras e {chars} caracteres."
+        df["Resumo"] = df["Resumo"].fillna("").astype(str).str.strip()
+        df.loc[df["Resumo"] == "", "Resumo"] = "(resumo do chat indisponível)"
 
-        df["Tem Anexo?"] = df["Conteúdo Completo"].str.contains(
-            r"uploaded:|\\[FILE\\]", case=False, regex=True
-        )
-        df["Categoria (IA)"] = df["Conteúdo Completo"].apply(_categorizar)
-        df["Resumo"] = df["Conteúdo Completo"].apply(_resumo)
+        if "Tem Anexo?" in df.columns:
+            df["Tem Anexo?"] = df["Tem Anexo?"].fillna(0).astype(int).astype(bool)
 
-        # Remove o conteúdo completo para não exibir na área de compliance
-        df = df.drop(columns=["Conteúdo Completo"])
+        df["Categoria (IA)"] = df["Resumo"].apply(_categorizar)
 
         return df
     finally:

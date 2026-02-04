@@ -6,11 +6,12 @@ from ..core.db import connect
 
 def create_thread(user_id: int, agent_id: int) -> int:
     title = f"Chat {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    default_topic_summary = "Novo chat iniciado."
     conn = connect()
     cur = conn.cursor()
     cur.execute(
-        'INSERT INTO chats (user_id, agent_id, title) VALUES (?, ?, ?)',
-        (user_id, agent_id, title),
+        'INSERT INTO chats (user_id, agent_id, title, conversation_topic_summary) VALUES (?, ?, ?, ?)',
+        (user_id, agent_id, title, default_topic_summary),
     )
     conn.commit()
     thread_id = cur.lastrowid
