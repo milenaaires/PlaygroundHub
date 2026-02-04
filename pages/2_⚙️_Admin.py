@@ -11,10 +11,12 @@ require_roles([ROLE_ADMIN])
 
 page_header("Admin — Usuários", subtitle="Gerencie usuários e papéis.")
 
+
 # ---------- Helpers ----------
 def _email_ok(email: str) -> bool:
     e = (email or "").strip().lower()
     return ("@" in e) and ("." in e)
+
 
 def _pw_ok(pw: str) -> bool:
     return pw is not None and len(pw) >= 8
@@ -24,8 +26,15 @@ def _pw_ok(pw: str) -> bool:
 @st.dialog("➕ Criar usuário")
 def dialog_create_user():
     with st.form("form_create_user", clear_on_submit=True):
-        email = (st.text_input("E-mail (novo usuário)", placeholder="user@empresa.com") or "").strip().lower()
-        role = st.selectbox("Role", ["ADMIN", "USER"])
+        email = (
+            (
+                st.text_input("E-mail (novo usuário)", placeholder="user@empresa.com")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        role = st.selectbox("Role", ["ADMIN", "USER", "COMPLIANCE"])
         active = st.checkbox("Ativo", value=True)
         pw1 = st.text_input("Senha inicial", type="password")
         pw2 = st.text_input("Confirmar senha", type="password")
@@ -55,7 +64,7 @@ def dialog_edit_user():
         return
 
     # escolha por id, mas mostrando email
-    options = {f'{u["id"]} — {u["email"]}': u for u in users}
+    options = {f"{u['id']} — {u['email']}": u for u in users}
     pick = st.selectbox("Selecione o usuário", list(options.keys()))
     u = options[pick]
 
@@ -63,7 +72,9 @@ def dialog_edit_user():
 
     with st.form("form_edit_user"):
         st.text_input("E-mail", value=u["email"], disabled=True)
-        role = st.selectbox("Role", ["ADMIN", "USER"], index=0 if u["role"] == "ADMIN" else 1)
+        role = st.selectbox(
+            "Role", ["ADMIN", "USER"], index=0 if u["role"] == "ADMIN" else 1
+        )
         active = st.checkbox("Ativo", value=bool(u["active"]))
 
         ok = st.form_submit_button("Salvar", type="primary")
@@ -89,7 +100,7 @@ def dialog_reset_password():
         st.info("Nenhum usuário encontrado.")
         return
 
-    options = {f'{u["id"]} — {u["email"]}': u for u in users}
+    options = {f"{u['id']} — {u['email']}": u for u in users}
     pick = st.selectbox("Selecione o usuário", list(options.keys()))
     u = options[pick]
 
@@ -127,7 +138,11 @@ with colC:
 
 st.divider()
 
-q = (st.text_input("Buscar por e-mail", placeholder="ex: user@empresa.com") or "").strip().lower()
+q = (
+    (st.text_input("Buscar por e-mail", placeholder="ex: user@empresa.com") or "")
+    .strip()
+    .lower()
+)
 users = list_users()
 if q:
     users = [u for u in users if q in (u["email"] or "").lower()]
