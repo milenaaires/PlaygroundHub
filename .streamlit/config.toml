@@ -8,8 +8,10 @@
 # Edite as opcoes abaixo e reinicie o servidor para ver o resultado.
 # Documentacao: https://docs.streamlit.io/develop/concepts/configuration/theming
 # =============================================================================
-
+[global]
+mainScriptLocation = "Home.py"
 [theme]
+
 # Herdar do tema claro ou escuro do Streamlit (ou caminho para arquivo TOML externo)
 # Valores: "light" | "dark" | "caminho/para/theme.toml"
 base = "dark"
