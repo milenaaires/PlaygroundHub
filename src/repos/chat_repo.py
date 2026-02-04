@@ -68,7 +68,10 @@ def add_message(
 
     filename_value = (attachment_filename or "").strip() or None
     if filename_value:
-        filename_value = Path(filename_value).name[:200]
+        # `Path(...).name` is OS-specific. On Linux, a Windows path like
+        # "C:\tmp\file.pdf" doesn't get split on "\". Normalize separators so we
+        # persist only the basename across platforms.
+        filename_value = Path(filename_value.replace("\\", "/")).name[:200] or None
     has_attachment_value = bool(has_attachment) if has_attachment is not None else bool(filename_value)
     cur.execute(
         "INSERT INTO chat_messages (chat_id, role, content, tokens, has_attachment, attachment_filename) VALUES (?, ?, ?, ?, ?, ?)",
