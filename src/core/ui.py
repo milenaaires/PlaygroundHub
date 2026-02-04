@@ -30,7 +30,7 @@ def page_header(page_name: str, title=None, subtitle=None):
     st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
 
 
-def sidebar_status(logo_path="assets/logo.png"):
+def sidebar_status(logo_path="assets/Logo.png"):
     # Sidebar: tamanho de texto + card do usuário (estilo MOVEdot: avatar, nome, email, Sair)
     st.markdown(
         """
