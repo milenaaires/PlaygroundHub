@@ -1,7 +1,17 @@
 ﻿from typing import Optional, Dict, Any, Tuple
 
+import re
+
 from src.core.config import get_settings
 from src.openai.client import get_openai_client
+
+
+_COMPLIANCE_SUMMARY_FALLBACK = "(resumo indisponível)"
+_COMPLIANCE_SUMMARY_MAX_CHARS = 300
+
+
+_EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+_LONG_NUMBER_RE = re.compile(r"\b\d{7,}\b")  # ex.: telefone/conta/IDs longos
 
 
 def _to_float(value, default: float) -> float:
@@ -43,6 +53,105 @@ def upload_pdf(uploaded_file) -> str:
         purpose='user_data',
     )
     return response.id
+
+
+def _compact_ws(text: str) -> str:
+    return " ".join((text or "").split())
+
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    txt = _compact_ws(text)
+    if max_chars <= 0 or len(txt) <= max_chars:
+        return txt
+    if max_chars <= 3:
+        return txt[:max_chars]
+    return (txt[: max_chars - 3].rstrip() + "...").strip()
+
+
+def _redact_summary_pii(text: str) -> str:
+    # Defesa em profundidade: mesmo com prompt, preferimos não persistir padrões óbvios de PII.
+    txt = _EMAIL_RE.sub("[REMOVIDO]", text or "")
+    txt = _LONG_NUMBER_RE.sub("[REMOVIDO]", txt)
+    return txt
+
+
+def _clamp_summary(text: str) -> str:
+    txt = _compact_ws(text).strip().strip('"').strip("'").strip()
+    txt = _redact_summary_pii(txt)
+    if not txt:
+        return _COMPLIANCE_SUMMARY_FALLBACK
+    if len(txt) <= _COMPLIANCE_SUMMARY_MAX_CHARS:
+        return txt
+    return _truncate_text(txt, _COMPLIANCE_SUMMARY_MAX_CHARS)
+
+
+def _render_messages_for_compliance_summary(
+    messages: list[Dict[str, Any]],
+    *,
+    max_messages: int = 12,
+    per_message_chars: int = 400,
+    max_total_chars: int = 4000,
+) -> str:
+    if not messages:
+        return ""
+
+    rendered: list[str] = []
+    total = 0
+    for msg in messages[-max_messages:]:
+        role = str(msg.get("role") or "").strip().upper() or "MESSAGE"
+        content = _truncate_text(str(msg.get("content") or ""), per_message_chars)
+        if not content:
+            continue
+        line = f"{role}: {content}".strip()
+        if max_total_chars > 0 and total + len(line) > max_total_chars:
+            break
+        rendered.append(line)
+        total += len(line)
+
+    return "\n".join(rendered).strip()
+
+
+def generate_compliance_summary(messages: list[Dict[str, Any]]) -> str:
+    """
+    Gera um resumo temático (1–3 frases) para fins de Compliance.
+
+    Importante: este resumo não deve conter PII nem citar trechos verbatim.
+    """
+    if not messages:
+        return "Novo chat iniciado."
+
+    transcript = _render_messages_for_compliance_summary(messages)
+    if not transcript:
+        return "Novo chat iniciado."
+
+    # Modelo barato/estável (evita depender do modelo configurado no agente).
+    model = "gpt-4o-mini"
+
+    instructions = (
+        "Você gera um resumo temático para revisão de Compliance.\n"
+        "Regras obrigatórias:\n"
+        "- 1 a 3 frases, máximo de 300 caracteres.\n"
+        "- Não inclua PII (nomes, emails, telefones, endereços, IDs, números de conta etc.).\n"
+        "- Não cite/quote mensagens e não copie trechos verbatim.\n"
+        "- Descreva apenas o tema e a intenção geral da conversa.\n"
+        "- Retorne somente o texto do resumo, sem markdown e sem prefixos."
+    )
+
+    try:
+        client = get_openai_client()
+        response = client.responses.create(
+            model=model,
+            instructions=instructions,
+            input=(
+                "Resuma o assunto principal desta conversa para Compliance.\n\n"
+                f"{transcript}\n"
+            ),
+            temperature=0.2,
+            max_output_tokens=120,
+        )
+        return _clamp_summary(getattr(response, "output_text", "") or "")
+    except Exception:
+        return _COMPLIANCE_SUMMARY_FALLBACK
 
 
 def run_agent_chat(
