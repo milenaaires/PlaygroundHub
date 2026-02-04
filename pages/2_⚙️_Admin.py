@@ -3,6 +3,9 @@ import streamlit as st
 from src.auth.rbac import require_roles, ROLE_ADMIN
 from src.core.ui import page_header
 from src.repos.users_repo import list_users, create_user, update_user, set_password
+from src.core.ui import sidebar_status
+
+sidebar_status()
 
 require_roles([ROLE_ADMIN])
 
