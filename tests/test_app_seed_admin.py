@@ -9,7 +9,7 @@ class FakeCtx:
 
 def test_seed_admin_creates_user_when_missing(monkeypatch):
     root = Path(__file__).resolve().parents[1]
-    app_path = root / "app.py"
+    app_path = root / "Home.py"
 
     # streamlit stub
     st_mod = types.ModuleType("streamlit")

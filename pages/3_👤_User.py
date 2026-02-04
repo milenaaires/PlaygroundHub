@@ -65,7 +65,7 @@ def _render_chat_config_and_messages(prefix=""):
         max_tokens = st.slider("Max Tokens", min_value=100, max_value=1000, value=100, step=100, key=f"{prefix}tokens")
         temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=0.5, step=0.1, key=f"{prefix}temp")
         st.text_area("System Prompt", value="You are a helpful assistant.", key=f"{prefix}system")
-        if st.button("Save Config", use_container_width=True, key=f"{prefix}save"):
+        if st.button("Save Config", width="stretch", key=f"{prefix}save"):
             create_agent(
                 user_id=user_id,
                 name=st.session_state.get(f"{prefix}agent_name", "Agent"),
@@ -164,7 +164,7 @@ def _render_access_chat(prefix: str):
     chat_id = st.session_state.get(key_chat)
 
     if not chat_id:
-        if st.button("Novo chat", key=f"{prefix}new_chat", use_container_width=True):
+        if st.button("Novo chat", key=f"{prefix}new_chat", width="stretch"):
             new_chat_id = create_chat(user_id, agent_id)
             st.session_state[key_chat] = new_chat_id
             if prefix == "access_popup_":
@@ -237,13 +237,13 @@ def _render_access_chat(prefix: str):
                 current_title = chat_row["title"] if chat_row else ""
             st.markdown("**Renomear chat**")
             new_title = st.text_input(
-                "Novo t?tulo",
+                "Novo título",
                 value=current_title,
                 key=f"{prefix}rename_title",
             )
             col_save, col_cancel = st.columns(2)
             with col_save:
-                if st.button("Salvar", key=f"{prefix}rename_save", use_container_width=True):
+                if st.button("Salvar", key=f"{prefix}rename_save", width="stretch"):
                     if new_title.strip():
                         rename_chat(rename_id, user_id, new_title.strip())
                     st.session_state.pop(rename_key, None)
@@ -251,7 +251,7 @@ def _render_access_chat(prefix: str):
                         st.session_state["reopen_popup"] = "access_chat"
                     st.rerun()
             with col_cancel:
-                if st.button("Cancelar", key=f"{prefix}rename_cancel", use_container_width=True):
+                if st.button("Cancelar", key=f"{prefix}rename_cancel", width="stretch"):
                     st.session_state.pop(rename_key, None)
                     if prefix == "access_popup_":
                         st.session_state["reopen_popup"] = "access_chat"
@@ -265,19 +265,19 @@ def _render_access_chat(prefix: str):
                     st.markdown(f"**{c['title']}**")
                     st.caption(c.get("updated_at") or c["created_at"])
                 with col_open:
-                    if st.button("Abrir", key=f"{prefix}open_{c['id']}", use_container_width=True):
+                    if st.button("Abrir", key=f"{prefix}open_{c['id']}", width="stretch"):
                         st.session_state[key_chat] = c["id"]
                         if prefix == "access_popup_":
                             st.session_state["reopen_popup"] = "access_chat"
                         st.rerun()
                 with col_rename:
-                    if st.button("Renomear", key=f"{prefix}rename_{c['id']}", use_container_width=True):
+                    if st.button("Renomear", key=f"{prefix}rename_{c['id']}", width="stretch"):
                         st.session_state[rename_key] = c["id"]
                         if prefix == "access_popup_":
                             st.session_state["reopen_popup"] = "access_chat"
                         st.rerun()
                 with col_delete:
-                    if st.button("Excluir", key=f"{prefix}delete_{c['id']}", use_container_width=True):
+                    if st.button("Excluir", key=f"{prefix}delete_{c['id']}", width="stretch"):
                         delete_chat(c["id"], user_id)
                         if st.session_state.get(key_chat) == c["id"]:
                             st.session_state.pop(key_chat, None)
@@ -329,7 +329,7 @@ if _dialog_decorator is not None:
             st.subheader("Editar agente")
             col_s, col_c = st.columns(2)
             with col_s:
-                if st.button("Salvar alterações", use_container_width=True, key="edit_popup_save"):
+                if st.button("Salvar alterações", width="stretch", key="edit_popup_save"):
                     update_agent(
                         agent_id=agent["id"],
                         user_id=user_id,
@@ -344,7 +344,7 @@ if _dialog_decorator is not None:
                     st.success("Agente atualizado.")
                     st.rerun()
             with col_c:
-                if st.button("Cancelar", use_container_width=True, key="edit_popup_cancel"):
+                if st.button("Cancelar", width="stretch", key="edit_popup_cancel"):
                     st.session_state.pop("edit_agent_id", None)
                     st.session_state["reopen_popup"] = "agents_list"
                     st.rerun()
@@ -480,12 +480,12 @@ if _dialog_decorator is not None:
                     if agent.get("description"):
                         st.caption(agent["description"][:80] + ("..." if len(agent.get("description", "")) > 80 else ""))
                 with col_actions:
-                    if st.button("Editar", key=f"{prefix}edit_btn_{agent['id']}", use_container_width=True):
+                    if st.button("Editar", key=f"{prefix}edit_btn_{agent['id']}", width="stretch"):
                         st.session_state["edit_agent_id"] = agent["id"]
                         if _dialog_decorator is not None:
                             st.session_state["reopen_popup"] = "edit_agent"
                         st.rerun()
-                    if st.button("Excluir", key=f"{prefix}del_btn_{agent['id']}", use_container_width=True):
+                    if st.button("Excluir", key=f"{prefix}del_btn_{agent['id']}", width="stretch"):
                         delete_agent(agent["id"], user_id)
                         if _dialog_decorator is not None:
                             st.session_state["reopen_popup"] = "agents_list"
@@ -561,7 +561,7 @@ with tabs[1]:
     if not st.session_state.get("chat_view") and not st.session_state.get("agents_view"):
         col_btn1, col_btn2, col_btn3 = st.columns(3)
         with col_btn1:
-            if st.button("Configurar Agente", type="primary", use_container_width=True):
+            if st.button("Configurar Agente", type="primary", width="stretch"):
                 if _dialog_decorator is not None:
                     st.session_state.chat_messages = [
                         {"role": "user", "content": "Olá!"},
@@ -571,7 +571,7 @@ with tabs[1]:
                 else:
                     _render_chat_config_and_messages(prefix="tab_")
         with col_btn2:
-            if st.button("Acessar Chat", use_container_width=True):
+            if st.button("Acessar Chat", width="stretch"):
                 if _dialog_decorator is not None:
                     access_chat_popup()
                 else:
@@ -580,7 +580,7 @@ with tabs[1]:
                     st.session_state.pop("edit_agent_id", None)
                     st.rerun()
         with col_btn3:
-            if st.button("Ver agentes", use_container_width=True):
+            if st.button("Ver agentes", width="stretch"):
                 st.session_state.pop("edit_agent_id", None)  # evita reabrir edit ao mostrar lista
                 if _dialog_decorator is not None:
                     agents_popup()
