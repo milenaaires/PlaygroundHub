@@ -1,167 +1,193 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from datetime import datetime
 
-# --- IMPORTS DO PROJETO ---
 try:
-    from src.core.ui import sidebar_status, page_header
-    from src.repos.compliance_repo import (
-        get_compliance_data,
-    )  # <--- Importando o repo real
+    from src.core.ui import sidebar_status
+    from src.repos.compliance_repo import get_compliance_data
 except ImportError:
-    st.error(
-        "Erro de importação. Verifique se o arquivo src/repos/compliance_repo.py existe."
-    )
+    st.error("Erro de importação. Verifique src/repos/compliance_repo.py")
     st.stop()
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Compliance & Auditoria", page_icon="🛡️", layout="wide")
+# --- CONFIG ---
+st.set_page_config(page_title="Compliance", page_icon="📋", layout="wide")
 sidebar_status()
-page_header("Compliance", title="Painel de Compliance", subtitle="Auditoria de prompts reais extraídos do banco de dados.")
-st.divider()
+
+st.title("🛡️ Painel de Compliance")
+st.markdown("Auditoria de segurança e monitoramento de custos.")
 
 
-# --- 2. FUNÇÃO DE CUSTO ---
-def calcular_custo(row):
-    # Preços estimados por token (Input) - Exemplo
-    # Você pode ajustar esses valores conforme a tabela da OpenAI/Anthropic
-    model = str(row["Modelo"]).lower()
-    tokens = row["Tokens"]
-
-    if "gpt-4" in model:
-        return tokens * (2.50 / 1_000_000)  # Ex: $2.50 por 1M tokens
-    elif "gpt-3.5" in model:
-        return tokens * (0.50 / 1_000_000)
-    else:
-        return tokens * (0.20 / 1_000_000)  # Preço genérico
-
-
-# --- 3. CAMADA DE DADOS (REAL) ---
-@st.cache_data(ttl=60)  # Cache de 60 segundos para não ficar lento
-def carregar_dados_reais():
+# --- LOAD DATA ---
+@st.cache_data(ttl=15)
+def carregar_dados():
     df = get_compliance_data()
-
     if df.empty:
         return df
 
-    # Enriquecimento dos dados (Processamento Python)
-    # 1. Calcular Custo
-    df["Custo ($)"] = df.apply(calcular_custo, axis=1)
+    def estimar_custo(row):
+        modelo = str(row["Modelo"]).lower()
+        tokens = row["Tokens"]
+        if "gpt-4" in modelo:
+            custo = 0.03
+        elif "gpt-3.5" in modelo:
+            custo = 0.0015
+        else:
+            custo = 0.001
+        return (tokens / 1000) * custo
 
-    # 2. Garantir colunas esperadas (quando o repo já retorna dados tratados)
-    if "Tem Anexo?" not in df.columns:
-        df["Tem Anexo?"] = False
-    if "Categoria (IA)" not in df.columns:
-        df["Categoria (IA)"] = "Geral/Dúvida"
-    if "Resumo" not in df.columns and "Conteúdo Completo" in df.columns:
-        df["Resumo"] = df["Conteúdo Completo"].fillna("").apply(
-            lambda txt: f"Mensagem com {len(str(txt).split())} palavras e {len(str(txt))} caracteres."
-        )
-        df = df.drop(columns=["Conteúdo Completo"])
-
+    df["Custo ($)"] = df.apply(estimar_custo, axis=1)
     return df
 
 
-df = carregar_dados_reais()
+df_full = carregar_dados()
 
-if df.empty:
-    st.warning(
-        "Nenhum dado encontrado no banco de dados. Comece a usar o chat para gerar registros."
-    )
+if df_full.empty:
+    st.warning("Sem dados de auditoria no momento.")
     st.stop()
 
+# ==============================================================================
+# 1. FILTROS (TOPO)
+# ==============================================================================
+with st.container(border=True):
+    st.markdown("### 🔍 Filtros")
+    c1, c2, c3, c4 = st.columns(4)
 
-# --- 4. FUNÇÃO DO POPUP ---
-@st.dialog("Detalhes da Auditoria", width="large")
-def mostrar_detalhes(row_data, full_df):
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.caption("Usuário")
-        st.subheader(row_data["Usuário"])
-    with col_b:
-        st.caption("Data")
-        # Garante que é timestamp antes de formatar
-        ts = pd.to_datetime(row_data["Data/Hora"])
-        st.subheader(ts.strftime("%d/%m/%Y %H:%M"))
+    with c1:
+        sel_users = st.multiselect("Usuário", options=df_full["Usuário"].unique())
 
-    st.divider()
-
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.markdown("**📝 Prompt do Usuário:**")
-        st.info(row_data["Resumo"])
-        st.caption(f"Modelo Utilizado: `{row_data['Modelo']}`")
-
-    with col2:
-        st.markdown("**Métricas:**")
-        if row_data["Tem Anexo?"]:
-            st.warning("⚠️ Contém Referência a Arquivo")
-            attachment_name = row_data.get("Arquivo")
-            if isinstance(attachment_name, str) and attachment_name.strip():
-                st.caption(f"Arquivo: `{attachment_name.strip()}`")
+    with c2:
+        if sel_users:
+            avail_agents = df_full[df_full["Usuário"].isin(sel_users)][
+                "Agente"
+            ].unique()
         else:
-            st.success("Texto Puro")
+            avail_agents = df_full["Agente"].unique()
+        sel_agents = st.multiselect("Agente", options=avail_agents)
+    with c3:
+        min_date = df_full["Data/Hora"].min().date()
+        date_range = st.date_input(
+            "Período", value=(min_date, datetime.now()), format="DD/MM/YYYY"
+        )
+    with c4:
+        only_att = st.checkbox("Com Anexos", value=False)
 
-        st.metric("Tokens (Input)", row_data["Tokens"])
-        st.metric("Custo Estimado", f"$ {row_data['Custo ($)']:.6f}")
+# --- APLICAR FILTROS ---
+df_filtered = df_full.copy()
 
-    st.divider()
-    st.subheader(f"📈 Atividade Recente: {row_data['Usuário']}")
-    user_history = full_df[full_df["Usuário"] == row_data["Usuário"]].copy()
-    user_history["Data"] = pd.to_datetime(user_history["Data/Hora"]).dt.date
-    daily_usage = user_history.groupby("Data")["Tokens"].sum().reset_index()
-    st.bar_chart(daily_usage, x="Data", y="Tokens", color="#FF4B4B")
+if sel_users:
+    df_filtered = df_filtered[df_filtered["Usuário"].isin(sel_users)]
+if sel_agents:
+    df_filtered = df_filtered[df_filtered["Agente"].isin(sel_agents)]
+if isinstance(date_range, tuple) and len(date_range) == 2:
+    s, e = date_range
+    df_filtered = df_filtered[
+        (df_filtered["Data/Hora"].dt.date >= s)
+        & (df_filtered["Data/Hora"].dt.date <= e)
+    ]
+if only_att:
+    df_filtered = df_filtered[df_filtered["Tem Anexo?"] == True]
 
+# ==============================================================================
+# 2. GRÁFICOS E KPI (CORRIGIDO: GRÁFICO AGORA APARECE SEMPRE)
+# ==============================================================================
+st.divider()
 
-# --- 5. FILTROS ---
-with st.sidebar:
-    st.header("🔍 Filtros DB")
-    usuarios_selecionados = st.multiselect("Usuários", options=df["Usuário"].unique())
+# Título dinâmico da seção
+if len(sel_users) == 1:
+    titulo_secao = f"📊 Análise: {sel_users[0]}"
+elif len(sel_agents) == 1:
+    titulo_secao = f"📊 Análise: Agente {sel_agents[0]}"
+else:
+    titulo_secao = "📊 Visão Geral"
 
-    min_date = df["Data/Hora"].min().date()
-    data_inicio = st.date_input("Início", value=min_date)
-    data_fim = st.date_input("Fim", value=datetime.now())
+st.subheader(titulo_secao)
 
-# Aplicação
-df_filtrado = df.copy()
-if usuarios_selecionados:
-    df_filtrado = df_filtrado[df_filtrado["Usuário"].isin(usuarios_selecionados)]
+# Colunas: KPIs na Esquerda, Gráfico na Direita
+col_kpi, col_chart = st.columns([1, 2])
 
-df_filtrado = df_filtrado[
-    (df_filtrado["Data/Hora"].dt.date >= data_inicio)
-    & (df_filtrado["Data/Hora"].dt.date <= data_fim)
-]
+with col_kpi:
+    total_tok = df_filtered["Tokens"].sum()
+    total_money = df_filtered["Custo ($)"].sum()
+    count_msg = len(df_filtered)
 
-# --- 6. TABELA ---
-st.subheader("📋 Auditoria de Prompts (Live DB)")
+    st.metric("Total Tokens", f"{total_tok:,.0f}")
+    st.metric("Custo Estimado", f"$ {total_money:.4f}")
+    st.metric("Total Interações", count_msg)
+
+with col_chart:
+    # Lógica do Gráfico: Agrupa por dia e soma tokens
+    if not df_filtered.empty:
+        chart_data = df_filtered.copy()
+        chart_data["Dia"] = chart_data["Data/Hora"].dt.date
+
+        # Agrupa e reseta index para o Streamlit entender
+        daily_usage = chart_data.groupby("Dia")["Tokens"].sum().reset_index()
+
+        st.caption("Evolução de uso de Tokens (Diário)")
+        st.bar_chart(daily_usage, x="Dia", y="Tokens", color="#FF4B4B")
+    else:
+        st.info("Sem dados para gerar gráfico.")
+
+# ==============================================================================
+# 3. TABELA
+# ==============================================================================
+st.divider()
+st.subheader("📋 Detalhamento")
 
 event = st.dataframe(
-    df_filtrado,
+    df_filtered,
     width="stretch",
     on_select="rerun",
     selection_mode="single-row",
     column_config={
         "Data/Hora": st.column_config.DatetimeColumn(format="DD/MM/YY HH:mm"),
-        "Custo ($)": st.column_config.NumberColumn(format="$ %.6f"),
+        "Custo ($)": st.column_config.NumberColumn(format="$ %.5f"),
         "Tem Anexo?": st.column_config.CheckboxColumn(label="📎"),
-        "Categoria (IA)": st.column_config.TextColumn(),
+        "Resumo": st.column_config.TextColumn(width="large", label="Tópico (Teor)"),
         "Tokens": st.column_config.ProgressColumn(
-            format="%d", min_value=0, max_value=8000
+            format="%d", min_value=0, max_value=4000
         ),
-        "Resumo": st.column_config.TextColumn(
-            width="small", label="Resumo"
-        ),
-        "id": None,  # Esconde IDs
-        "Modelo": None,
-        "role": None,
+        "Acesso": st.column_config.TextColumn(label="Role"),  # <--- CORREÇÃO VISUAL
+        # Ocultos
         "Arquivo": None,
+        "id": None,
+        "Agente": None,
+        "Modelo": None,
+        "Categoria (IA)": None,
     },
     hide_index=True,
 )
 
+
+# ==============================================================================
+# 4. POPUP
+# ==============================================================================
+@st.dialog("Detalhes da Auditoria", width="large")
+def show_popup(row):
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        st.subheader(row["Agente"])
+        st.caption(
+            f"Usuário: {row['Usuário']} ({row['Acesso']})"
+        )  # Mostra Role no popup tb
+    with c2:
+        st.metric("Custo", f"$ {row['Custo ($)']:.5f}")
+
+    st.divider()
+
+    st.markdown("#### 📝 Resumo do Tópico")
+    st.info(row["Resumo"])
+
+    if row["Tem Anexo?"]:
+        st.markdown("#### 📎 Arquivo Detectado")
+        with st.container(border=True):
+            st.code(row["Arquivo"], language="text")
+
+    st.caption(
+        f"Modelo: {row['Modelo']} | Tokens: {row['Tokens']} | Data: {row['Data/Hora']}"
+    )
+
+
 if len(event.selection.rows) > 0:
-    selected_index = event.selection.rows[0]
-    # Atenção: pegar pelo índice correto do dataframe filtrado
-    selected_row = df_filtrado.iloc[selected_index]
-    mostrar_detalhes(selected_row, df)
+    idx = event.selection.rows[0]
+    show_popup(df_filtered.iloc[idx])
