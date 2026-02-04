@@ -61,7 +61,7 @@ if df_full.empty:
 # ==============================================================================
 with st.container(border=True):
     st.markdown("### 🔍 Filtros")
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
 
     with c1:
         sel_users = st.multiselect("Usuário", options=df_full["Usuário"].unique())
@@ -81,6 +81,10 @@ with st.container(border=True):
         )
     with c4:
         only_att = st.checkbox("Com Anexos", value=False)
+    with c5:
+        origens = df_full["Origem"].unique().tolist() if "Origem" in df_full.columns else []
+        options_origem = ["Todos"] + origens
+        sel_origem = st.selectbox("Origem", options=options_origem, index=0)
 
 # --- APLICAR FILTROS ---
 df_filtered = df_full.copy()
@@ -97,6 +101,8 @@ if isinstance(date_range, tuple) and len(date_range) == 2:
     ]
 if only_att:
     df_filtered = df_filtered[df_filtered["Tem Anexo?"] == True]
+if "Origem" in df_filtered.columns and sel_origem and sel_origem != "Todos":
+    df_filtered = df_filtered[df_filtered["Origem"] == sel_origem]
 
 # ==============================================================================
 # 2. GRÁFICOS E KPI (CORRIGIDO: GRÁFICO AGORA APARECE SEMPRE)
@@ -158,7 +164,8 @@ event = st.dataframe(
         "Tokens": st.column_config.ProgressColumn(
             format="%d", min_value=0, max_value=4000
         ),
-        "Acesso": st.column_config.TextColumn(label="Role"),  # <--- CORREÇÃO VISUAL
+        "Acesso": st.column_config.TextColumn(label="Role"),
+        "Origem": st.column_config.TextColumn(label="Origem"),
         # Ocultos
         "Arquivo": None,
         "id": None,
