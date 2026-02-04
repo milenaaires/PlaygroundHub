@@ -2,19 +2,30 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
+# --- IMPORTS DO PROJETO ---
 try:
     from src.core.ui import sidebar_status
     from src.repos.compliance_repo import get_compliance_data
+
+    # NOVOS IMPORTS DE SEGURANÇA
+    from src.auth.rbac import require_roles, ROLE_COMPLIANCE, ROLE_ADMIN
 except ImportError:
-    st.error("Erro de importação. Verifique src/repos/compliance_repo.py")
+    st.error(
+        "Erro de importação: Verifique se os arquivos em src/auth/ e src/repos/ existem."
+    )
     st.stop()
 
-# --- CONFIG ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Compliance", page_icon="📋", layout="wide")
 sidebar_status()
 
+# --- VERIFICAÇÃO DE ACESSO (RBAC) ---
+# Isso vai parar a execução (st.stop()) se o usuário não tiver o papel necessário.
+# ROLE_ADMIN também para que você (Admin) consiga testar/debugar.
+require_roles({ROLE_COMPLIANCE, ROLE_ADMIN})
+
 st.title("🛡️ Painel de Compliance")
-st.markdown("Auditoria de segurança e monitoramento de custos.")
+st.markdown("Monitoramento de auditoria baseada em tópicos (Privacy-First).")
 
 
 # --- LOAD DATA ---
