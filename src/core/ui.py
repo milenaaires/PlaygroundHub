@@ -113,7 +113,7 @@ def sidebar_status(logo_path="assets/Logo.png"):
     )
     with st.sidebar:
         try:
-            st.image(logo_path, use_container_width=True)
+            st.image(logo_path, width="stretch")
         except Exception:
             pass
 
@@ -139,7 +139,7 @@ def sidebar_status(logo_path="assets/Logo.png"):
                 unsafe_allow_html=True,
             )
             st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
-            if st.button("Sair (Logout)", key="sidebar_logout", use_container_width=True):
+            if st.button("Sair (Logout)", key="sidebar_logout", width="stretch"):
                 st.session_state.clear()
                 st.rerun()
         else:

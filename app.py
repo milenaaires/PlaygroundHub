@@ -30,5 +30,21 @@ ensure_admin()
 sidebar_status()
 
 # --- Menu superior: breadcrumb (PlaygroundHub > Início) + título ---
-page_header("Início", title="PlaygroundHub", subtitle="Playground corporativo com controle, papéis e auditoria.")
-st.write("Use o menu lateral para navegar.")
+page_header("Home", title="PlaygroundHub", subtitle="Playground corporativo com controle, papéis e auditoria.")
+
+st.markdown("Use o menu lateral para navegar.")
+
+st.markdown("---")
+st.markdown("### Visão geral")
+
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("**🔐 Login** — Autenticação por e-mail e senha. Acesso conforme perfil (Admin ou User).")
+    st.markdown("**👤 Área do usuário** — Criar e editar agentes de IA (modelo, prompt, tipo Chat/SQL), testar no chat e manter histórico de conversas por agente. Anexar PDFs nas conversas.")
+    st.markdown("**📋 Compliance** — Auditoria dos prompts enviados pelos usuários.")
+with col2:
+    st.markdown("**⚙️ Admin** — Gerenciar usuários (listar, editar, ativar/desativar, redefinir senha).")
+    st.markdown("**🧩 Agentes** — Cada agente tem nome, descrição, modelo (ex.: GPT-4o), tokens, temperatura, system prompt e opção de conexão SQL. Chats são salvos e reabríveis.")
+
+st.markdown("---")
+st.caption("PlaygroundHub — controle de acesso, agentes configuráveis e auditoria.")
