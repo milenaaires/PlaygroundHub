@@ -73,7 +73,9 @@ def dialog_edit_user():
     with st.form("form_edit_user"):
         st.text_input("E-mail", value=u["email"], disabled=True)
         role = st.selectbox(
-            "Role", ["ADMIN", "USER"], index=0 if u["role"] == "ADMIN" else 1
+            "Role",
+            ["ADMIN", "USER", "COMPLIANCE"],
+            index=0 if u["role"] == "ADMIN" else 1,
         )
         active = st.checkbox("Ativo", value=bool(u["active"]))
 
