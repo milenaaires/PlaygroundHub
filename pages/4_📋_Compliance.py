@@ -38,13 +38,20 @@ def carregar_dados():
     def estimar_custo(row):
         modelo = str(row["Modelo"]).lower()
         tokens = row["Tokens"]
+
+        # Preços médios por 1k tokens (considerando mix de input/output)
         if "gpt-4" in modelo:
-            custo = 0.03
+            custo_por_1k = 0.03
         elif "gpt-3.5" in modelo:
-            custo = 0.0015
+            custo_por_1k = 0.0015
+        elif "claude-3" in modelo:
+            custo_por_1k = 0.015
         else:
-            custo = 0.001
-        return (tokens / 1000) * custo
+            custo_por_1k = 0.001
+
+        return (tokens / 1000) * custo_por_1k
+
+    df["Custo ($)"] = df.apply(estimar_custo, axis=1)
 
     df["Custo ($)"] = df.apply(estimar_custo, axis=1)
     return df
@@ -82,7 +89,9 @@ with st.container(border=True):
     with c4:
         only_att = st.checkbox("Com Anexos", value=False)
     with c5:
-        origens = df_full["Origem"].unique().tolist() if "Origem" in df_full.columns else []
+        origens = (
+            df_full["Origem"].unique().tolist() if "Origem" in df_full.columns else []
+        )
         options_origem = ["Todos"] + origens
         sel_origem = st.selectbox("Origem", options=options_origem, index=0)
 
