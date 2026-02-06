@@ -6,7 +6,6 @@ from src.repos.agents_repo import (
     list_agents_by_user,
     get_agent,
     update_agent,
-    delete_agent,
 )
 from src.repos.chat_repo import (
     get_messages,
@@ -18,7 +17,6 @@ from src.repos.chat_repo import (
     update_previous_response_id,
     update_conversation_topic_summary,
     rename_chat,
-    delete_chat,
 )
 from src.agents.service import run_agent_chat, upload_pdf, generate_compliance_summary
 from src.core.db import init_db
@@ -326,7 +324,7 @@ def _render_access_chat(prefix: str):
 
         for c in chats:
             with st.container():
-                col_info, col_open, col_rename, col_delete = st.columns([3, 1, 1, 1])
+                col_info, col_open, col_rename = st.columns([3, 1, 1])
                 with col_info:
                     st.markdown(f"**{c['title']}**")
                     st.caption(c.get("updated_at") or c["created_at"])
@@ -339,14 +337,6 @@ def _render_access_chat(prefix: str):
                 with col_rename:
                     if st.button("Renomear", key=f"{prefix}rename_{c['id']}", width="stretch"):
                         st.session_state[rename_key] = c["id"]
-                        if prefix == "access_popup_":
-                            st.session_state["reopen_popup"] = "access_chat"
-                        st.rerun()
-                with col_delete:
-                    if st.button("Excluir", key=f"{prefix}delete_{c['id']}", width="stretch"):
-                        delete_chat(c["id"], user_id)
-                        if st.session_state.get(key_chat) == c["id"]:
-                            st.session_state.pop(key_chat, None)
                         if prefix == "access_popup_":
                             st.session_state["reopen_popup"] = "access_chat"
                         st.rerun()
@@ -535,7 +525,7 @@ if _dialog_decorator is not None:
         _render_access_chat(prefix="access_popup_")
 
     def _render_agents_list(prefix: str):
-        """Lista de agentes com Editar e Excluir (dentro do popup Ver agentes ou inline).
+        """Lista de agentes com Editar (dentro do popup Ver agentes ou inline).
         Nunca chamar outro @st.dialog daqui (Streamlit não permite diálogos aninhados).
         """
         saved = list_agents_by_user(user_id)
@@ -591,11 +581,6 @@ if _dialog_decorator is not None:
                         if _dialog_decorator is not None:
                             st.session_state["reopen_popup"] = "edit_agent"
                         st.rerun()
-                    if st.button("Excluir", key=f"{prefix}del_btn_{agent['id']}", width="stretch"):
-                        delete_agent(agent["id"], user_id)
-                        if _dialog_decorator is not None:
-                            st.session_state["reopen_popup"] = "agents_list"
-                        st.rerun()
                 st.divider()
 
     @_dialog_decorator("Ver agentes", width=DIALOG_WIDTH)
@@ -632,7 +617,6 @@ with tabs[0]:
     st.markdown("""
     - Ver a **lista** de todos os agentes que você criou (nome, modelo, id).
     - **Editar** um agente: alterar nome, descrição, modelo, tokens, temperatura e system prompt; ao cancelar, volta para a lista.
-    - **Excluir** um agente (as conversas vinculadas também são removidas).
     """)
 
     st.markdown("---")
